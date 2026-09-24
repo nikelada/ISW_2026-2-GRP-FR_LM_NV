@@ -1,17 +1,17 @@
 # Lumina Auth App
 
-A full-stack login web app with two independent projects: a vanilla HTML/JavaScript frontend powered by Vite and an Express JavaScript backend managed with nodemon.
+Una aplicación web de inicio de sesión full-stack con dos proyectos independientes: un frontend en HTML/JavaScript puro impulsado por Vite y un backend en Express con JavaScript gestionado con nodemon.
 
-## Requirements
+## Requisitos
 
 - Node.js 18+
 - npm
 
-## Run locally
+## Ejecutar en local
 
-The frontend and backend are separate projects, but they work together through the `/api` route. Vite forwards frontend API requests to the Express backend.
+El frontend y el backend son proyectos independientes, pero trabajan juntos a través de la ruta `/api`. Vite redirige las peticiones de API del frontend hacia el backend de Express.
 
-To start both together from the project root:
+Para iniciar ambos juntos desde la raíz del proyecto:
 
 ```bash
 npm install
@@ -19,9 +19,9 @@ npm run install:all
 npm run dev
 ```
 
-Open http://localhost:5173.
+Abre http://localhost:5173.
 
-You can also run them separately in two terminals.
+También puedes ejecutarlos por separado en dos terminales.
 
 ### Backend
 
@@ -31,7 +31,7 @@ npm install
 npm run dev
 ```
 
-The API runs at http://localhost:3000.
+La API se ejecuta en http://localhost:3000.
 
 ### Frontend
 
@@ -41,37 +41,37 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173.
+Abre http://localhost:5173.
 
-The API runs at http://localhost:3000. The default demo account is:
+La API se ejecuta en http://localhost:3000. La cuenta de demostración por defecto es:
 
-- Email: `demo@lumina.app`
-- Password: `demo1234`
+- Correo electrónico: `demo@lumina.app`
+- Contraseña: `demo1234`
 
-## Project structure
+## Estructura del proyecto
 
-- `frontend/` contains the Vite app, HTML entry point, JavaScript, and CSS.
-- `backend/` contains the Express API, authentication logic, and nodemon script.
-- `frontend/.env.example` configures the API URL.
-- `backend/.env.example` configures the port and JWT secret.
+- `frontend/` contiene la aplicación Vite, el punto de entrada HTML, el JavaScript y el CSS.
+- `backend/` contiene la API de Express, la lógica de autenticación y el script de nodemon.
+- `frontend/.env.example` configura la URL de la API.
+- `backend/.env.example` configura el puerto y el secreto JWT.
 
-The frontend and backend remain independently installable, while the root scripts coordinate them for normal development.
+El frontend y el backend siguen siendo instalables de forma independiente, mientras que los scripts de la raíz los coordinan para el desarrollo habitual.
 
-## PostgreSQL configuration
+## Configuración de PostgreSQL
 
-1. Create a PostgreSQL database named `lumina_auth`.
-2. Copy `backend/.env.example` to `backend/.env`.
-3. Set your PostgreSQL password in `backend/.env`.
-4. Run `npm run dev` from the project root.
+1. Crea una base de datos PostgreSQL llamada `lumina_auth`.
+2. Copia `backend/.env.example` a `backend/.env`.
+3. Establece tu contraseña de PostgreSQL en `backend/.env`.
+4. Ejecuta `npm run dev` desde la raíz del proyecto.
 
-The backend creates the `users` table and seeds these accounts on first startup:
+El backend crea la tabla `users` y siembra estas cuentas en el primer arranque:
 
-| Role | Email | Password |
+| Rol | Correo electrónico | Contraseña |
 | --- | --- | --- |
 | Admin | `admin@lumina.app` | `admin2026` |
 | Manager | `manager@lumina.app` | `manager2026` |
 | Usuario | `usuario@lumina.app` | `usuario2026` |
 
-## Notes
+## Notas
 
-Users are stored in PostgreSQL. `synchronize: true` is useful for local development only; use migrations before production. Set a strong `JWT_SECRET`, serve over HTTPS, and move tokens to secure httpOnly cookies before deployment.
+Los usuarios se almacenan en PostgreSQL. `synchronize: true` es útil únicamente para el desarrollo local; usa migraciones antes de pasar a producción. Establece un `JWT_SECRET` robusto, sirve la aplicación mediante HTTPS y mueve los tokens a cookies httpOnly seguras antes del despliegue.
