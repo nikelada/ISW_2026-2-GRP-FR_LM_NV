@@ -6,7 +6,7 @@ import { seedInitialUsers } from './config/initialSetup.js';
 async function startServer() {
   await connectDB();
   await seedInitialUsers();
-  app.listen(PORT, () => console.log(`Lumina API running at http://localhost:${PORT}`));
+  app.listen(PORT, () => console.log(`API de NES Eventos en http://localhost:${PORT}`));
 }
 
 startServer().catch((error) => {
