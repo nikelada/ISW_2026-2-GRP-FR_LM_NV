@@ -11,7 +11,7 @@ const CAMPOS_PARA_COTIZAR = [
   { campo: 'servicios', etiqueta: 'Servicios necesarios' }
 ];
 
-const ESTADOS = ['pendiente', 'disponible_cotizar'];
+const ESTADOS = ['pendiente', 'disponible_cotizar', 'confirmado'];
 const INCLUIR_CLIENTE = { cliente: { select: { id: true, nombre: true } } };
 
 // Prisma representa DATE y TIME de PostgreSQL como Date en UTC.
@@ -100,10 +100,19 @@ export async function crear(datos) {
   return aRespuesta(creada);
 }
 
-// Permite completar o corregir los datos; el estado se recalcula.
+// Permite completar o corregir los datos mientras el evento no esté confirmado; el estado se recalcula.
 export async function actualizar(id, datos) {
   const actual = await obtenerPorId(id);
+  if (actual.estado === 'confirmado') {
+    throw Object.assign(new Error('El evento ya está confirmado; sus datos no se pueden editar desde la solicitud.'), { status: 409 });
+  }
   if (datos.clienteId !== actual.clienteId) await asegurarClienteRegistrado(datos.clienteId);
-  const actualizada = await prisma.solicitud.update({ where: { id }, data: aDatos(datos), include: INCLUIR_CLIENTE });
+
+  const data = aDatos(datos);
+  // Si cambia la fecha o el horario, la disponibilidad debe revisarse de nuevo.
+  if (datos.fecha !== actual.fecha || datos.horaInicio !== actual.horaInicio || datos.horaFin !== actual.horaFin) {
+    data.fechaHabilitada = false;
+  }
+  const actualizada = await prisma.solicitud.update({ where: { id }, data, include: INCLUIR_CLIENTE });
   return aRespuesta(actualizada);
 }

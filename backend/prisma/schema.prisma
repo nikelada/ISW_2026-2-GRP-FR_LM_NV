@@ -35,6 +35,8 @@ model Cliente {
 enum EstadoSolicitud {
   pendiente
   disponible_cotizar
+  // Lo asigna el proceso que confirma el evento; se usa para detectar conflictos de horario.
+  confirmado
 }
 
 // Solicitud de evento. Los datos pueden faltar: en ese caso queda pendiente.
@@ -49,9 +51,12 @@ model Solicitud {
   lugar            String?         @db.VarChar(255)
   servicios        String?         @db.Text
   estado           EstadoSolicitud @default(pendiente)
+  // La fecha y horario fueron revisados sin conflicto y pueden continuar a confirmación.
+  fechaHabilitada  Boolean         @default(false)
   createdAt        DateTime        @default(now()) @db.Timestamp(6)
   updatedAt        DateTime        @updatedAt @db.Timestamp(6)
 
   @@index([clienteId])
+  @@index([fecha])
   @@map("solicitudes")
 }
