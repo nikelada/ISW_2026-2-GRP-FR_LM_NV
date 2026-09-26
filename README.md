@@ -64,6 +64,16 @@ El backend siembra estas cuentas en el primer arranque:
 | Manager | `manager@lumina.app` | `manager2026` |
 | Usuario | `usuario@lumina.app` | `usuario2026` |
 
+## Datos de prueba
+
+Para cargar clientes y solicitudes de ejemplo (incluidos eventos con fecha confirmada), ejecuta dentro de `backend/`:
+
+```bash
+npm run seed
+```
+
+Solo inserta datos si todavía no hay clientes registrados. Las fechas se calculan a partir del día en que se ejecuta.
+
 ## Estructura del proyecto
 
 ```
