@@ -18,3 +18,15 @@ model User {
 
   @@map("users")
 }
+
+// Datos obligatorios del cliente definidos por la empresa.
+model Cliente {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @db.VarChar(150)
+  telefono  String   @db.VarChar(30)
+  correo    String   @db.VarChar(255)
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+
+  @@map("clientes")
+}

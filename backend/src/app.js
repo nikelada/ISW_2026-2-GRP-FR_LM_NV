@@ -2,7 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import router from './routes/index.routes.js';
-import { manejarErrores } from './middlewares/manejarErrores.js';
+import { manejarErrores } from './middlewares/error.middleware.js';
 
 // Arma la aplicación Express, pero no la inicia.
 const app = express();
