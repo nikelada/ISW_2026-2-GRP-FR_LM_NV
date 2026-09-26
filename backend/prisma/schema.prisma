@@ -18,3 +18,45 @@ model User {
 
   @@map("users")
 }
+
+// Datos obligatorios del cliente definidos por la empresa.
+model Cliente {
+  id          Int         @id @default(autoincrement())
+  nombre      String      @db.VarChar(150)
+  telefono    String      @db.VarChar(30)
+  correo      String      @db.VarChar(255)
+  solicitudes Solicitud[]
+  createdAt   DateTime    @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime    @updatedAt @db.Timestamp(6)
+
+  @@map("clientes")
+}
+
+enum EstadoSolicitud {
+  pendiente
+  disponible_cotizar
+  // Lo asigna el proceso que confirma el evento; se usa para detectar conflictos de horario.
+  confirmado
+}
+
+// Solicitud de evento. Los datos pueden faltar: en ese caso queda pendiente.
+model Solicitud {
+  id               Int             @id @default(autoincrement())
+  clienteId        Int
+  cliente          Cliente         @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  fecha            DateTime?       @db.Date
+  horaInicio       DateTime?       @db.Time(0)
+  horaFin          DateTime?       @db.Time(0)
+  cantidadPersonas Int?
+  lugar            String?         @db.VarChar(255)
+  servicios        String?         @db.Text
+  estado           EstadoSolicitud @default(pendiente)
+  // La fecha y horario fueron revisados sin conflicto y pueden continuar a confirmación.
+  fechaHabilitada  Boolean         @default(false)
+  createdAt        DateTime        @default(now()) @db.Timestamp(6)
+  updatedAt        DateTime        @updatedAt @db.Timestamp(6)
+
+  @@index([clienteId])
+  @@index([fecha])
+  @@map("solicitudes")
+}

@@ -1,95 +1,66 @@
 import { useState } from 'react';
-import BrandMark from '../components/BrandMark.jsx';
+import Aviso from '../components/ui/Aviso.jsx';
+import Boton from '../components/ui/Boton.jsx';
+import Campo from '../components/ui/Campo.jsx';
 import { login, register } from '../services/authService.js';
 import { saveSession } from '../utils/session.js';
 
 export default function AuthPage({ onAuthenticated }) {
-  const [mode, setMode] = useState('login');
-  const [message, setMessage] = useState({ text: '', type: 'error' });
-  const [isBusy, setIsBusy] = useState(false);
-  const [showPassword, setShowPassword] = useState(false);
-  const isLogin = mode === 'login';
+  const [modo, setModo] = useState('login');
+  const [error, setError] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const esLogin = modo === 'login';
 
-  function switchMode() {
-    setMode(isLogin ? 'register' : 'login');
-    setMessage({ text: '', type: 'error' });
-    setShowPassword(false);
+  function cambiarModo() {
+    setModo(esLogin ? 'registro' : 'login');
+    setError('');
   }
 
-  async function handleAuth(event) {
+  async function enviar(event) {
     event.preventDefault();
-    if (isBusy) return;
-    setIsBusy(true);
-    const data = Object.fromEntries(new FormData(event.currentTarget).entries());
+    setEnviando(true);
+    setError('');
+    const datos = Object.fromEntries(new FormData(event.currentTarget).entries());
     try {
-      const session = isLogin ? await login(data) : await register(data);
+      const session = esLogin ? await login(datos) : await register(datos);
       saveSession(session);
       onAuthenticated(session.user);
-    } catch (error) {
-      setMessage({ text: error.message, type: 'error' });
-      setIsBusy(false);
+    } catch (e) {
+      setError(e.message);
+      setEnviando(false);
     }
   }
 
-  const busyLabel = isLogin ? 'Checking...' : 'Creating...';
-  const submitLabel = isLogin ? 'Enter workspace' : 'Create account';
-
   return (
-    <main className="auth-shell">
-      <section className="brand-panel">
-        <BrandMark />
-        <p className="eyebrow">LUMINA / PRIVATE SPACE</p>
-        <h1>Make room for<br /><em>clear thinking.</em></h1>
-        <p className="brand-copy">A quiet, focused workspace for the work that matters. Your ideas stay yours.</p>
-        <div className="brand-footer"><span className="signal-dot"></span> End-to-end workspace security</div>
-      </section>
-      <section className="form-panel">
-        <div className="form-wrap">
-          <div className="mobile-brand"><BrandMark /><span>LUMINA</span></div>
-          <div className="form-heading">
-            <p className="eyebrow">{isLogin ? 'WELCOME BACK' : 'START FRESH'}</p>
-            <h2>{isLogin ? 'Sign in to your space' : 'Create your space'}</h2>
-            <p>{isLogin ? 'Enter your details to continue where you left off.' : 'A few details and you are ready to begin.'}</p>
-          </div>
-          <form id="auth-form" key={mode} onSubmit={handleAuth}>
-            {!isLogin && <label>Full name<input name="name" type="text" autoComplete="name" placeholder="Alex Morgan" required /></label>}
-            {!isLogin && (
-              <label>User type
-                <select name="role" required>
-                  <option value="usuario">Usuario</option>
-                  <option value="manager">Manager</option>
-                  <option value="admin">Admin</option>
-                </select>
-              </label>
-            )}
-            <label>Email address<input name="email" type="email" autoComplete="email" placeholder="you@example.com" required /></label>
-            <label>Password
-              <div className="password-field">
-                <input name="password" type={showPassword ? 'text' : 'password'} autoComplete="current-password" placeholder="Minimum 8 characters" required />
-                <button className="password-toggle" type="button" aria-label="Show password" onClick={() => setShowPassword(!showPassword)}>
-                  {showPassword ? 'Hide' : 'Show'}
-                </button>
-              </div>
-            </label>
-            {isLogin ? (
-              <div className="form-options">
-                <label className="check-label"><input type="checkbox" name="remember" defaultChecked /> <span>Remember me</span></label>
-                <button type="button" className="text-button" id="forgot-button" onClick={() => setMessage({ text: 'Password recovery will be available soon.', type: 'info' })}>Forgot password?</button>
-              </div>
-            ) : (
-              <p className="password-note">Use at least 8 characters for your password.</p>
-            )}
-            <p className={`form-message ${message.type}`} id="form-message" role="alert">{message.text}</p>
-            <button className="primary-button" type="submit" disabled={isBusy}>
-              <span>{isBusy ? busyLabel : submitLabel}</span><span className="arrow">→</span>
-            </button>
-          </form>
-          <div className="switch-auth">
-            <span>{isLogin ? 'New to Lumina?' : 'Already have an account?'}</span>
-            <button type="button" className="text-button" id="switch-mode" onClick={switchMode}>{isLogin ? 'Create an account' : 'Sign in'}</button>
-          </div>
-          <p className="legal">By continuing, you agree to our <a href="#">Terms</a> and <a href="#">Privacy Policy</a>.</p>
-        </div>
+    <main className="grid min-h-screen place-items-center px-4 py-6">
+      <section className="w-full max-w-sm rounded-lg border border-stone-200 bg-white p-8">
+        <h1 className="mb-1 text-2xl font-bold">NES Eventos</h1>
+        <p className="mb-6 text-sm text-stone-500">{esLogin ? 'Inicia sesión para continuar.' : 'Crea una cuenta nueva.'}</p>
+        <form key={modo} className="grid gap-4" onSubmit={enviar}>
+          {!esLogin && <Campo etiqueta="Nombre"><input name="name" type="text" autoComplete="name" required /></Campo>}
+          {!esLogin && (
+            <Campo etiqueta="Área">
+              <select name="role">
+                <option value="usuario">Producción y Comercial</option>
+                <option value="manager">Gerencia</option>
+                <option value="admin">Administración</option>
+              </select>
+            </Campo>
+          )}
+          <Campo etiqueta="Correo"><input name="email" type="email" autoComplete="email" required /></Campo>
+          <Campo etiqueta="Contraseña">
+            <input name="password" type="password" autoComplete={esLogin ? 'current-password' : 'new-password'} required />
+          </Campo>
+          {!esLogin && <p className="text-xs text-stone-500">La contraseña debe tener al menos 8 caracteres.</p>}
+          {error && <Aviso tipo="error" className=""><p>{error}</p></Aviso>}
+          <Boton type="submit" disabled={enviando}>
+            <span>{enviando ? 'Enviando…' : esLogin ? 'Ingresar' : 'Crear cuenta'}</span><span aria-hidden="true">→</span>
+          </Boton>
+        </form>
+        <p className="mt-5 text-center text-sm text-stone-500">
+          {esLogin ? '¿No tienes cuenta? ' : '¿Ya tienes cuenta? '}
+          <Boton variante="enlace" onClick={cambiarModo}>{esLogin ? 'Crear una' : 'Iniciar sesión'}</Boton>
+        </p>
       </section>
     </main>
   );
