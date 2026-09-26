@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "prisma migrate deploy && nodemon src/index.js",
-    "start": "prisma migrate deploy && node src/index.js",
+    "dev": "prisma migrate deploy && prisma generate && nodemon src/index.js",
+    "start": "prisma migrate deploy && prisma generate && node src/index.js",
     "migrate": "prisma migrate dev",
     "postinstall": "prisma generate"
   },
