@@ -1,6 +1,5 @@
-import User from '../entities/user.entity.js';
-import { AppDataSource } from './configDb.js';
-import { hashPassword } from '../helpers/password.helper.js';
+import { prisma } from './prisma.js';
+import { hashPassword } from '../services/auth.service.js';
 
 const initialUsers = [
   { name: 'Ignacio Perez', email: 'admin@lumina.app', password: 'admin2026', role: 'admin' },
@@ -9,18 +8,12 @@ const initialUsers = [
 ];
 
 export async function seedInitialUsers() {
-  const repository = AppDataSource.getRepository(User);
-  await repository.update({ role: 'admin' }, { role: 'admin' });
-  await repository.update({ role: 'manager' }, { role: 'manager' });
-  await repository.update({ role: 'usuario' }, { role: 'usuario' });
-
   for (const initialUser of initialUsers) {
-    const exists = await repository.findOneBy({ email: initialUser.email });
+    const exists = await prisma.user.findUnique({ where: { email: initialUser.email } });
     if (!exists) {
-      await repository.save(repository.create({
-        ...initialUser,
-        password: await hashPassword(initialUser.password)
-      }));
+      await prisma.user.create({
+        data: { ...initialUser, password: await hashPassword(initialUser.password) }
+      });
     }
   }
 }
