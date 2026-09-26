@@ -1,11 +1,22 @@
 # Lumina Auth App
 
-Una aplicación web de inicio de sesión full-stack con dos proyectos independientes: un frontend en HTML/JavaScript puro impulsado por Vite y un backend en Express con JavaScript gestionado con nodemon.
+Aplicación web full-stack PERN + Prisma: PostgreSQL, Express, React y Node.js, con Prisma como ORM. El frontend es una aplicación React impulsada por Vite y el backend es una API Express gestionada con nodemon.
 
 ## Requisitos
 
 - Node.js 18+
 - npm
+- PostgreSQL
+
+## Configuración de PostgreSQL
+
+1. Crea una base de datos PostgreSQL llamada `lumina_auth`.
+2. Copia `backend/.env.example` a `backend/.env`.
+3. Ajusta `DATABASE_URL` en `backend/.env` con tu usuario y contraseña de PostgreSQL.
+
+Las tablas se crean con las migraciones de Prisma (`backend/prisma/migrations`). Los scripts `dev` y `start` del backend aplican automáticamente las migraciones pendientes (`prisma migrate deploy`) antes de iniciar la API.
+
+> Si ya tenías la base `lumina_auth` creada por la versión anterior (TypeORM), elimínala y créala de nuevo antes de iniciar: la migración inicial crea la tabla `users` y los usuarios iniciales se vuelven a sembrar al arrancar.
 
 ## Ejecutar en local
 
@@ -43,28 +54,9 @@ npm run dev
 
 Abre http://localhost:5173.
 
-La API se ejecuta en http://localhost:3000. La cuenta de demostración por defecto es:
+## Usuarios iniciales
 
-- Correo electrónico: `demo@lumina.app`
-- Contraseña: `demo1234`
-
-## Estructura del proyecto
-
-- `frontend/` contiene la aplicación Vite, el punto de entrada HTML, el JavaScript y el CSS.
-- `backend/` contiene la API de Express, la lógica de autenticación y el script de nodemon.
-- `frontend/.env.example` configura la URL de la API.
-- `backend/.env.example` configura el puerto y el secreto JWT.
-
-El frontend y el backend siguen siendo instalables de forma independiente, mientras que los scripts de la raíz los coordinan para el desarrollo habitual.
-
-## Configuración de PostgreSQL
-
-1. Crea una base de datos PostgreSQL llamada `lumina_auth`.
-2. Copia `backend/.env.example` a `backend/.env`.
-3. Establece tu contraseña de PostgreSQL en `backend/.env`.
-4. Ejecuta `npm run dev` desde la raíz del proyecto.
-
-El backend crea la tabla `users` y siembra estas cuentas en el primer arranque:
+El backend siembra estas cuentas en el primer arranque:
 
 | Rol | Correo electrónico | Contraseña |
 | --- | --- | --- |
@@ -72,6 +64,36 @@ El backend crea la tabla `users` y siembra estas cuentas en el primer arranque:
 | Manager | `manager@lumina.app` | `manager2026` |
 | Usuario | `usuario@lumina.app` | `usuario2026` |
 
+## Estructura del proyecto
+
+```
+backend/
+├── prisma/
+│   ├── schema.prisma      modelos de datos
+│   └── migrations/        migraciones de PostgreSQL
+└── src/
+    ├── config/            variables de entorno, cliente Prisma y usuarios iniciales
+    ├── routes/            endpoints: conectan middlewares y controladores
+    ├── middlewares/       autenticación, validación de entrada y manejo de errores
+    ├── controllers/       reciben req/res, llaman al servicio y responden
+    ├── services/          reglas del negocio y acceso a datos con Prisma
+    ├── app.js             arma la aplicación Express
+    └── index.js           conecta la base de datos e inicia el servidor
+
+frontend/
+└── src/
+    ├── pages/             pantallas completas
+    ├── components/        piezas reutilizables
+    ├── services/          comunicación con el backend (único lugar con fetch)
+    ├── utils/             funciones auxiliares
+    ├── App.jsx
+    └── main.jsx
+```
+
+Flujo de una petición en el backend: `routes → middlewares → controllers → services → Prisma → PostgreSQL`.
+
+Para cambiar el modelo de datos, edita `backend/prisma/schema.prisma` y ejecuta `npm run migrate` dentro de `backend/` para crear la migración.
+
 ## Notas
 
-Los usuarios se almacenan en PostgreSQL. `synchronize: true` es útil únicamente para el desarrollo local; usa migraciones antes de pasar a producción. Establece un `JWT_SECRET` robusto, sirve la aplicación mediante HTTPS y mueve los tokens a cookies httpOnly seguras antes del despliegue.
+Establece un `JWT_SECRET` robusto, sirve la aplicación mediante HTTPS y mueve los tokens a cookies httpOnly seguras antes del despliegue.
