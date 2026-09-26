@@ -1,4 +1,4 @@
-const SESSION_KEY = 'lumina_session';
+const SESSION_KEY = 'nes_session';
 
 export function getStoredSession() {
   try {
