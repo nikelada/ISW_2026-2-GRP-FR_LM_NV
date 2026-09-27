@@ -1,5 +1,12 @@
 const TIPOS_PRECIO = ['fijo', 'por_hora'];
 
+function precioEnteroPositivo(valor) {
+  const texto = String(valor ?? '').trim();
+  if (!/^\d+$/.test(texto)) return null;
+  const precio = Number(texto);
+  return Number.isSafeInteger(precio) && precio > 0 ? precio : null;
+}
+
 function textoOpcional(valor) {
   const texto = String(valor ?? '').trim();
   return texto || null;
@@ -33,11 +40,11 @@ function validarBase(datos) {
 export function validarServicio(req, res, next) {
   const datos = datosBase(req);
   const tipoPrecio = String(req.body.tipoPrecio || '').trim();
-  const precio = Number(req.body.precio);
+  const precio = precioEnteroPositivo(req.body.precio);
   const errores = validarBase(datos);
 
   if (!TIPOS_PRECIO.includes(tipoPrecio)) errores.tipoPrecio = 'El tipo de precio debe ser fijo o por_hora.';
-  if (!Number.isInteger(precio) || precio <= 0) errores.precio = 'El precio debe ser un entero mayor que cero.';
+  if (precio === null) errores.precio = 'El precio debe ser un entero mayor que cero.';
 
   if (Object.keys(errores).length) {
     return res.status(400).json({ message: 'Revisa los datos del servicio.', errores });
@@ -78,8 +85,8 @@ export function validarCambioServicio(req, res, next) {
   }
 
   if (incluyePrecio) {
-    const precio = Number(req.body.precio);
-    if (!Number.isInteger(precio) || precio <= 0) errores.precio = 'El precio debe ser un entero mayor que cero.';
+    const precio = precioEnteroPositivo(req.body.precio);
+    if (precio === null) errores.precio = 'El precio debe ser un entero mayor que cero.';
     else datos.precio = precio;
   }
 
