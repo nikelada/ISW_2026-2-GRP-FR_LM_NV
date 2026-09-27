@@ -3,7 +3,6 @@ import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
-import Badge from '../components/ui/Badge.jsx';
 import Boton from '../components/ui/Boton.jsx';
 import Campo from '../components/ui/Campo.jsx';
 import ListaDatos from '../components/ui/ListaDatos.jsx';
@@ -15,6 +14,13 @@ import * as tipoServicioService from '../services/tipoServicioService.js';
 import { esProduccion } from '../utils/roles.js';
 
 const TIPO_VACIO = { nombre: '', descripcion: '' };
+const SERVICIO_VACIO = {
+  tipoServicioId: '',
+  nombre: '',
+  descripcion: '',
+  precio: '',
+  tipoPrecio: 'fijo'
+};
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
   style: 'currency',
@@ -56,6 +62,11 @@ export default function ServiciosPage({ user }) {
   const [vista, setVista] = useState('servicios');
   const [tipoServicioId, setTipoServicioId] = useState('');
   const [seleccionado, setSeleccionado] = useState(null);
+  const [creandoServicio, setCreandoServicio] = useState(false);
+  const [formServicio, setFormServicio] = useState(SERVICIO_VACIO);
+  const [erroresServicio, setErroresServicio] = useState({});
+  const [avisoServicio, setAvisoServicio] = useState(null);
+  const [guardandoServicio, setGuardandoServicio] = useState(false);
   const [creandoTipo, setCreandoTipo] = useState(false);
   const [formTipo, setFormTipo] = useState(TIPO_VACIO);
   const [erroresTipo, setErroresTipo] = useState({});
@@ -70,7 +81,8 @@ export default function ServiciosPage({ user }) {
   const {
     datos: servicios,
     cargando,
-    error: errorServicios
+    error: errorServicios,
+    recargar: recargarServicios
   } = useFetch(useCallback(() => servicioService.listar(), []));
 
   const serviciosFiltrados = useMemo(
@@ -88,16 +100,59 @@ export default function ServiciosPage({ user }) {
   );
 
   useEffect(() => {
-    if (!seleccionado) return;
-    const actualizado = serviciosFiltrados.find((servicio) => servicio.id === seleccionado.id);
-    setSeleccionado(actualizado || null);
-  }, [serviciosFiltrados, seleccionado?.id]);
+    setSeleccionado((actual) => {
+      if (!actual) return actual;
+      return serviciosFiltrados.find((servicio) => servicio.id === actual.id) || null;
+    });
+  }, [serviciosFiltrados]);
 
   function cambiarVista() {
     setVista(vista === 'servicios' ? 'tipos' : 'servicios');
+    setCreandoServicio(false);
     setCreandoTipo(false);
+    setErroresServicio({});
     setErroresTipo({});
+    setAvisoServicio(null);
     setAvisoTipo(null);
+  }
+
+  function nuevoServicio() {
+    setFormServicio(SERVICIO_VACIO);
+    setErroresServicio({});
+    setAvisoServicio(null);
+    setCreandoServicio(true);
+  }
+
+  function seleccionarServicio(servicio) {
+    setSeleccionado(servicio);
+    setCreandoServicio(false);
+    setErroresServicio({});
+    setAvisoServicio(null);
+  }
+
+  function cancelarServicio() {
+    setCreandoServicio(false);
+    setErroresServicio({});
+  }
+
+  async function guardarServicio(event) {
+    event.preventDefault();
+    setGuardandoServicio(true);
+    setAvisoServicio(null);
+    try {
+      const creado = await servicioService.crear(formServicio);
+      setSeleccionado(creado);
+      setCreandoServicio(false);
+      setFormServicio(SERVICIO_VACIO);
+      setErroresServicio({});
+      setAvisoServicio({ tipo: 'success', texto: `Servicio «${creado.nombre}» registrado.` });
+      recargarServicios();
+    } catch (error) {
+      setErroresServicio(error.data?.errores || {});
+      setAvisoServicio({ tipo: 'error', texto: error.message });
+    } finally {
+      setGuardandoServicio(false);
+    }
   }
 
   function nuevoTipo() {
@@ -141,6 +196,7 @@ export default function ServiciosPage({ user }) {
           : 'Tipos utilizados para organizar los servicios disponibles.'}
       >
         <div className="flex gap-2.5">
+          {vista === 'servicios' && puedeEditar && <Boton onClick={nuevoServicio}>Nuevo servicio</Boton>}
           {vista === 'tipos' && puedeEditar && <Boton onClick={nuevoTipo}>Nuevo tipo de servicio</Boton>}
           <Boton variante="secundario" onClick={cambiarVista}>
             {vista === 'servicios' ? 'Tipos de servicio' : 'Ver servicios'}
@@ -213,6 +269,9 @@ export default function ServiciosPage({ user }) {
           {(errorTipos || errorServicios) && (
             <Aviso tipo="error" className="m-3.5">{errorTipos || errorServicios}</Aviso>
           )}
+          {avisoServicio && !creandoServicio && (
+            <Aviso tipo={avisoServicio.tipo} className="m-3.5">{avisoServicio.texto}</Aviso>
+          )}
           {cargando && !servicios.length
             ? <Vacio>Cargando…</Vacio>
             : (
@@ -221,16 +280,90 @@ export default function ServiciosPage({ user }) {
                 datos={serviciosFiltrados}
                 vacio="No hay servicios disponibles con este filtro."
                 seleccionadoId={seleccionado?.id}
-                onSeleccionar={setSeleccionado}
+                onSeleccionar={seleccionarServicio}
               />
             )}
           </Panel>
 
           <Panel lateral>
-            <DetalleServicio servicio={seleccionado} />
+            {creandoServicio ? (
+              <FormularioServicio
+                tipos={tipos}
+                form={formServicio}
+                setForm={setFormServicio}
+                errores={erroresServicio}
+                aviso={avisoServicio}
+                guardando={guardandoServicio}
+                onGuardar={guardarServicio}
+                onCancelar={cancelarServicio}
+              />
+            ) : <DetalleServicio servicio={seleccionado} />}
           </Panel>
         </div>
       )}
+    </>
+  );
+}
+
+function FormularioServicio({ tipos, form, setForm, errores, aviso, guardando, onGuardar, onCancelar }) {
+  const campo = (nombre) => ({
+    name: nombre,
+    value: form[nombre],
+    onChange: (event) => setForm({ ...form, [nombre]: event.target.value })
+  });
+
+  return (
+    <>
+      <Antetitulo className="mb-2">Nuevo servicio</Antetitulo>
+      <h2 className="mb-4 text-xl font-bold">Registrar servicio</h2>
+      {aviso && <Aviso tipo={aviso.tipo}>{aviso.texto}</Aviso>}
+      {!tipos.length && (
+        <Aviso tipo="warning">Registra primero un tipo de servicio.</Aviso>
+      )}
+      <form className="grid gap-4" onSubmit={onGuardar} noValidate>
+        <Campo etiqueta="Tipo de servicio" error={errores.tipoServicioId}>
+          <select {...campo('tipoServicioId')}>
+            <option value="">Selecciona un tipo</option>
+            {tipos.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.nombre}</option>)}
+          </select>
+        </Campo>
+        <Campo etiqueta="Nombre" error={errores.nombre}>
+          <input type="text" maxLength={150} {...campo('nombre')} />
+        </Campo>
+        <Campo etiqueta="Descripción" error={errores.descripcion}>
+          <textarea maxLength={1000} {...campo('descripcion')} />
+        </Campo>
+        <Campo etiqueta="Precio" error={errores.precio}>
+          <input
+            type="number"
+            min="1"
+            max="10000000"
+            step="1"
+            className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+            name="precio"
+            value={form.precio}
+            onKeyDown={(event) => {
+              if (['-', '+', 'e', 'E', '.', ','].includes(event.key)) event.preventDefault();
+            }}
+            onChange={(event) => {
+              if (/^\d*$/.test(event.target.value)) setForm({ ...form, precio: event.target.value });
+            }}
+          />
+        </Campo>
+        <Campo etiqueta="Cobro" error={errores.tipoPrecio}>
+          <select {...campo('tipoPrecio')}>
+            <option value="fijo">Precio fijo</option>
+            <option value="por_hora">Por hora</option>
+          </select>
+        </Campo>
+        <p className="text-xs text-stone-500">Todos los campos son obligatorios.</p>
+        <div className="flex gap-2.5">
+          <Boton type="submit" className="flex-1" disabled={guardando || !tipos.length}>
+            <span>{guardando ? 'Guardando…' : 'Registrar servicio'}</span><span aria-hidden="true">→</span>
+          </Boton>
+          <Boton variante="secundario" onClick={onCancelar}>Cancelar</Boton>
+        </div>
+      </form>
     </>
   );
 }
@@ -250,7 +383,6 @@ function DetalleServicio({ servicio }) {
     <>
       <Antetitulo className="mb-2">{servicio.tipoServicio.nombre}</Antetitulo>
       <h2 className="mb-2 text-xl font-bold">{servicio.nombre}</h2>
-      <Badge color={servicio.activo ? 'verde' : 'rojo'}>{servicio.activo ? 'Activo' : 'Inactivo'}</Badge>
       <ListaDatos datos={[
         ['Descripción', servicio.descripcion || '—'],
         ['Precio', version ? formatoPrecio.format(version.precio) : '—'],
