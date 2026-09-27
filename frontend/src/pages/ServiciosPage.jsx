@@ -5,12 +5,16 @@ import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Boton from '../components/ui/Boton.jsx';
+import Campo from '../components/ui/Campo.jsx';
 import ListaDatos from '../components/ui/ListaDatos.jsx';
 import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
 import * as servicioService from '../services/servicioService.js';
 import * as tipoServicioService from '../services/tipoServicioService.js';
+import { esProduccion } from '../utils/roles.js';
+
+const TIPO_VACIO = { nombre: '', descripcion: '' };
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
   style: 'currency',
@@ -47,14 +51,21 @@ const columnasTipos = [
   { campo: 'cantidadServicios', titulo: 'Servicios' }
 ];
 
-export default function ServiciosPage() {
+export default function ServiciosPage({ user }) {
+  const puedeEditar = esProduccion(user);
   const [vista, setVista] = useState('servicios');
   const [tipoServicioId, setTipoServicioId] = useState('');
   const [seleccionado, setSeleccionado] = useState(null);
+  const [creandoTipo, setCreandoTipo] = useState(false);
+  const [formTipo, setFormTipo] = useState(TIPO_VACIO);
+  const [erroresTipo, setErroresTipo] = useState({});
+  const [avisoTipo, setAvisoTipo] = useState(null);
+  const [guardandoTipo, setGuardandoTipo] = useState(false);
   const {
     datos: tipos,
     cargando: cargandoTipos,
-    error: errorTipos
+    error: errorTipos,
+    recargar: recargarTipos
   } = useFetch(useCallback(() => tipoServicioService.listar(), []));
   const {
     datos: servicios,
@@ -82,6 +93,44 @@ export default function ServiciosPage() {
     setSeleccionado(actualizado || null);
   }, [serviciosFiltrados, seleccionado?.id]);
 
+  function cambiarVista() {
+    setVista(vista === 'servicios' ? 'tipos' : 'servicios');
+    setCreandoTipo(false);
+    setErroresTipo({});
+    setAvisoTipo(null);
+  }
+
+  function nuevoTipo() {
+    setFormTipo(TIPO_VACIO);
+    setErroresTipo({});
+    setAvisoTipo(null);
+    setCreandoTipo(true);
+  }
+
+  function cancelarTipo() {
+    setCreandoTipo(false);
+    setErroresTipo({});
+  }
+
+  async function guardarTipo(event) {
+    event.preventDefault();
+    setGuardandoTipo(true);
+    setAvisoTipo(null);
+    try {
+      const creado = await tipoServicioService.crear(formTipo);
+      setAvisoTipo({ tipo: 'success', texto: `Tipo de servicio «${creado.nombre}» registrado.` });
+      setCreandoTipo(false);
+      setFormTipo(TIPO_VACIO);
+      setErroresTipo({});
+      recargarTipos();
+    } catch (error) {
+      setErroresTipo(error.data?.errores || {});
+      setAvisoTipo({ tipo: 'error', texto: error.message });
+    } finally {
+      setGuardandoTipo(false);
+    }
+  }
+
   return (
     <>
       <EncabezadoPagina
@@ -91,24 +140,62 @@ export default function ServiciosPage() {
           ? 'Servicios disponibles y su precio actual.'
           : 'Tipos utilizados para organizar los servicios disponibles.'}
       >
-        <Boton variante="secundario" onClick={() => setVista(vista === 'servicios' ? 'tipos' : 'servicios')}>
-          {vista === 'servicios' ? 'Tipos de servicio' : 'Ver servicios'}
-        </Boton>
+        <div className="flex gap-2.5">
+          {vista === 'tipos' && puedeEditar && <Boton onClick={nuevoTipo}>Nuevo tipo de servicio</Boton>}
+          <Boton variante="secundario" onClick={cambiarVista}>
+            {vista === 'servicios' ? 'Tipos de servicio' : 'Ver servicios'}
+          </Boton>
+        </div>
       </EncabezadoPagina>
 
       {vista === 'tipos' ? (
-        <Panel>
-          {errorTipos && <Aviso tipo="error" className="m-3.5">{errorTipos}</Aviso>}
-          {cargandoTipos && !tipos.length
-            ? <Vacio>Cargando…</Vacio>
-            : (
-              <DataTable
-                columnas={columnasTipos}
-                datos={tiposConCantidad}
-                vacio="No hay tipos de servicio registrados."
-              />
-            )}
-        </Panel>
+        <div className={`grid grid-cols-1 items-start gap-4 ${creandoTipo ? 'lg:grid-cols-[minmax(0,1fr)_380px]' : ''}`}>
+          <Panel>
+            {errorTipos && <Aviso tipo="error" className="m-3.5">{errorTipos}</Aviso>}
+            {avisoTipo && !creandoTipo && <Aviso tipo={avisoTipo.tipo} className="m-3.5">{avisoTipo.texto}</Aviso>}
+            {cargandoTipos && !tipos.length
+              ? <Vacio>Cargando…</Vacio>
+              : (
+                <DataTable
+                  columnas={columnasTipos}
+                  datos={tiposConCantidad}
+                  vacio="No hay tipos de servicio registrados."
+                />
+              )}
+          </Panel>
+
+          {creandoTipo && (
+            <Panel lateral>
+              <Antetitulo className="mb-2">Nuevo tipo</Antetitulo>
+              <h2 className="mb-4 text-xl font-bold">Registrar tipo de servicio</h2>
+              {avisoTipo && <Aviso tipo={avisoTipo.tipo}>{avisoTipo.texto}</Aviso>}
+              <form className="grid gap-4" onSubmit={guardarTipo} noValidate>
+                <Campo etiqueta="Nombre" error={erroresTipo.nombre}>
+                  <input
+                    type="text"
+                    maxLength={100}
+                    value={formTipo.nombre}
+                    onChange={(event) => setFormTipo({ ...formTipo, nombre: event.target.value })}
+                  />
+                </Campo>
+                <Campo etiqueta="Descripción" error={erroresTipo.descripcion}>
+                  <textarea
+                    maxLength={1000}
+                    value={formTipo.descripcion}
+                    onChange={(event) => setFormTipo({ ...formTipo, descripcion: event.target.value })}
+                  />
+                </Campo>
+                <p className="text-xs text-stone-500">El nombre es obligatorio.</p>
+                <div className="flex gap-2.5">
+                  <Boton type="submit" className="flex-1" disabled={guardandoTipo}>
+                    <span>{guardandoTipo ? 'Guardando…' : 'Registrar tipo'}</span><span aria-hidden="true">→</span>
+                  </Boton>
+                  <Boton variante="secundario" onClick={cancelarTipo}>Cancelar</Boton>
+                </div>
+              </form>
+            </Panel>
+          )}
+        </div>
       ) : (
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
           <Panel>
