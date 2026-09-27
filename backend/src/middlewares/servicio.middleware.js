@@ -1,6 +1,6 @@
 const TIPOS_PRECIO = ['fijo', 'por_hora'];
-const PRECIO_MAXIMO = 1000000000;
-const MENSAJE_PRECIO = 'El precio debe ser un entero entre 1 y 1.000.000.000.';
+const PRECIO_MAXIMO = 10000000;
+const MENSAJE_PRECIO = 'El precio debe ser un entero entre 1 y 10.000.000.';
 
 function precioEnteroPositivo(valor) {
   const texto = String(valor ?? '').trim();
