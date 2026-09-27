@@ -14,10 +14,11 @@ import { useFetch } from '../hooks/useFetch.js';
 import * as calendarioService from '../services/calendarioService.js';
 import * as clienteService from '../services/clienteService.js';
 import * as solicitudService from '../services/solicitudService.js';
+import * as servicioService from '../services/servicioService.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
-const VACIO = { clienteId: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '', servicios: '' };
+const VACIO = { clienteId: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '' };
 
 const sinDato = (texto = '—') => <span className="text-xs text-amber-700">{texto}</span>;
 
@@ -41,6 +42,7 @@ export default function SolicitudesPage({ user, params }) {
   const [filtro, setFiltro] = useState('');
   const { datos: solicitudes, cargando, error, recargar } = useFetch(useCallback(() => solicitudService.listar(filtro), [filtro]));
   const { datos: clientes } = useFetch(useCallback(() => clienteService.listar(), []));
+  const { datos: serviciosDisponibles, error: errorServicios } = useFetch(useCallback(() => servicioService.listar(), []));
 
   const [seleccionada, setSeleccionada] = useState(null);
   const [modo, setModo] = useState(puedeEditar && params.get('nueva') === '1' ? 'nueva' : 'detalle');
@@ -48,6 +50,9 @@ export default function SolicitudesPage({ user, params }) {
   const [errores, setErrores] = useState({});
   const [aviso, setAviso] = useState(null);
   const [guardando, setGuardando] = useState(false);
+  const [tipoServicioParaAgregar, setTipoServicioParaAgregar] = useState('');
+  const [servicioParaAgregar, setServicioParaAgregar] = useState('');
+  const [servicioProcesando, setServicioProcesando] = useState('');
   const [resultado, setResultado] = useState(null);
   const idInicial = Number(params.get('id')) || null;
 
@@ -70,6 +75,8 @@ export default function SolicitudesPage({ user, params }) {
     setAviso(null);
     setErrores({});
     setResultado(null);
+    setTipoServicioParaAgregar('');
+    setServicioParaAgregar('');
   }
 
   function nueva() {
@@ -129,6 +136,37 @@ export default function SolicitudesPage({ user, params }) {
     recargar();
   }
 
+  async function agregarServicio() {
+    if (!seleccionada || !servicioParaAgregar) return;
+    setServicioProcesando('agregar');
+    setAviso(null);
+    try {
+      const actualizada = await solicitudService.agregarServicio(seleccionada.id, Number(servicioParaAgregar));
+      setSeleccionada(actualizada);
+      setServicioParaAgregar('');
+      recargar();
+    } catch (e) {
+      setAviso({ tipo: 'error', texto: e.message });
+    } finally {
+      setServicioProcesando('');
+    }
+  }
+
+  async function quitarServicio(servicioId) {
+    if (!seleccionada) return;
+    setServicioProcesando(`quitar-${servicioId}`);
+    setAviso(null);
+    try {
+      const actualizada = await solicitudService.quitarServicio(seleccionada.id, servicioId);
+      setSeleccionada(actualizada);
+      recargar();
+    } catch (e) {
+      setAviso({ tipo: 'error', texto: e.message });
+    } finally {
+      setServicioProcesando('');
+    }
+  }
+
   const campo = (nombre) => ({
     name: nombre,
     value: form[nombre],
@@ -158,7 +196,26 @@ export default function SolicitudesPage({ user, params }) {
 
         <Panel lateral>
           {modo === 'detalle' ? (
-            <DetalleSolicitud solicitud={seleccionada} aviso={aviso} resultado={resultado} puedeEditar={puedeEditar} onEditar={editar} onRevisarFecha={revisarFecha} />
+            <DetalleSolicitud
+              solicitud={seleccionada}
+              aviso={aviso}
+              resultado={resultado}
+              puedeEditar={puedeEditar}
+              serviciosDisponibles={serviciosDisponibles}
+              errorServicios={errorServicios}
+              tipoServicioParaAgregar={tipoServicioParaAgregar}
+              servicioParaAgregar={servicioParaAgregar}
+              servicioProcesando={servicioProcesando}
+              onTipoServicioParaAgregar={(tipo) => {
+                setTipoServicioParaAgregar(tipo);
+                setServicioParaAgregar('');
+              }}
+              onServicioParaAgregar={setServicioParaAgregar}
+              onAgregarServicio={agregarServicio}
+              onQuitarServicio={quitarServicio}
+              onEditar={editar}
+              onRevisarFecha={revisarFecha}
+            />
           ) : (
             <>
               <Antetitulo className="mb-2">{modo === 'editar' ? `Solicitud #${seleccionada.id}` : 'Nueva solicitud'}</Antetitulo>
@@ -179,8 +236,7 @@ export default function SolicitudesPage({ user, params }) {
                 </div>
                 <Campo etiqueta="Cantidad de personas" error={errores.cantidadPersonas}><input type="number" min="1" step="1" {...campo('cantidadPersonas')} /></Campo>
                 <Campo etiqueta="Lugar" error={errores.lugar}><input type="text" maxLength={255} {...campo('lugar')} /></Campo>
-                <Campo etiqueta="Servicios necesarios" error={errores.servicios}><textarea placeholder="Ej.: banquetería, sonido, iluminación" {...campo('servicios')} /></Campo>
-                <p className="text-xs text-stone-500">El cliente es obligatorio. Si falta algún otro dato, la solicitud quedará pendiente hasta completarla.</p>
+                <p className="text-xs text-stone-500">El cliente es obligatorio. Los servicios se asociarán después de registrar la solicitud. Si falta algún otro dato, la solicitud quedará pendiente hasta completarla.</p>
                 <div className="flex gap-2.5">
                   <Boton type="submit" className="flex-1" disabled={guardando}>
                     <span>{modo === 'editar' ? 'Guardar cambios' : 'Registrar solicitud'}</span><span aria-hidden="true">→</span>
@@ -196,7 +252,23 @@ export default function SolicitudesPage({ user, params }) {
   );
 }
 
-function DetalleSolicitud({ solicitud, aviso, resultado, puedeEditar, onEditar, onRevisarFecha }) {
+function DetalleSolicitud({
+  solicitud,
+  aviso,
+  resultado,
+  puedeEditar,
+  serviciosDisponibles,
+  errorServicios,
+  tipoServicioParaAgregar,
+  servicioParaAgregar,
+  servicioProcesando,
+  onTipoServicioParaAgregar,
+  onServicioParaAgregar,
+  onAgregarServicio,
+  onQuitarServicio,
+  onEditar,
+  onRevisarFecha
+}) {
   if (!solicitud) {
     return (
       <>
@@ -208,6 +280,16 @@ function DetalleSolicitud({ solicitud, aviso, resultado, puedeEditar, onEditar, 
   const s = solicitud;
   const confirmada = s.estado === 'confirmado';
   const puedeRevisarFecha = !confirmada && s.fecha && s.horaInicio && s.horaFin;
+  const servicios = s.servicios || [];
+  const idsAsociados = new Set(servicios.map((servicio) => servicio.id));
+  const serviciosActivos = serviciosDisponibles.filter((servicio) => servicio.tipoServicio?.activo !== false);
+  const opcionesDisponibles = serviciosActivos.filter((servicio) => !idsAsociados.has(servicio.id));
+  const tiposDisponibles = Array.from(
+    new Map(serviciosActivos.map((servicio) => [servicio.tipoServicio.id, servicio.tipoServicio])).values()
+  ).sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const serviciosDelTipo = opcionesDisponibles.filter(
+    (servicio) => servicio.tipoServicioId === Number(tipoServicioParaAgregar)
+  );
   return (
     <>
       <Antetitulo className="mb-2">Solicitud #{s.id}</Antetitulo>
@@ -231,9 +313,66 @@ function DetalleSolicitud({ solicitud, aviso, resultado, puedeEditar, onEditar, 
         ['Fecha', s.fecha ? formatearFecha(s.fecha) : '—'],
         ['Horario', formatearHorario(s) || '—'],
         ['Cantidad de personas', s.cantidadPersonas ?? '—'],
-        ['Lugar', s.lugar || '—'],
-        ['Servicios necesarios', s.servicios || '—']
+        ['Lugar', s.lugar || '—']
       ]} />
+      <div className="mb-4 border-t border-stone-200 pt-4">
+        <Antetitulo className="mb-2">Servicios necesarios</Antetitulo>
+        {servicios.length ? (
+          <ul className="mb-3 grid gap-2 text-sm">
+            {servicios.map((servicio) => (
+              <li key={servicio.id} className="flex items-center justify-between gap-3 rounded-md bg-stone-50 px-3 py-2">
+                <span className="font-medium">{servicio.nombre}</span>
+                {puedeEditar && !confirmada && (
+                  <Boton
+                    variante="enlace"
+                    disabled={Boolean(servicioProcesando)}
+                    onClick={() => onQuitarServicio(servicio.id)}
+                  >
+                    {servicioProcesando === `quitar-${servicio.id}` ? 'Quitando…' : 'Quitar'}
+                  </Boton>
+                )}
+              </li>
+            ))}
+          </ul>
+        ) : <p className="mb-3 text-sm text-stone-500">No hay servicios asociados.</p>}
+        {errorServicios && <Aviso tipo="error" className="mb-3">{errorServicios}</Aviso>}
+        {puedeEditar && !confirmada && (
+          <div className="grid gap-2.5">
+            <select
+              aria-label="Tipo de servicio para agregar"
+              value={tipoServicioParaAgregar}
+              onChange={(event) => onTipoServicioParaAgregar(event.target.value)}
+              disabled={Boolean(servicioProcesando)}
+            >
+              <option value="">Selecciona un tipo de servicio</option>
+              {tiposDisponibles.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.nombre}</option>)}
+            </select>
+            <div className="flex gap-2.5">
+              <select
+                className="min-w-0 flex-1"
+                aria-label="Servicio para agregar"
+                value={servicioParaAgregar}
+                onChange={(event) => onServicioParaAgregar(event.target.value)}
+                disabled={!tipoServicioParaAgregar || !serviciosDelTipo.length || Boolean(servicioProcesando)}
+              >
+                <option value="">
+                  {tipoServicioParaAgregar && !serviciosDelTipo.length
+                    ? 'No hay más servicios disponibles de este tipo'
+                    : 'Selecciona un servicio activo'}
+                </option>
+                {serviciosDelTipo.map((servicio) => <option key={servicio.id} value={servicio.id}>{servicio.nombre}</option>)}
+              </select>
+              <Boton
+                variante="secundario"
+                disabled={!servicioParaAgregar || Boolean(servicioProcesando)}
+                onClick={onAgregarServicio}
+              >
+                {servicioProcesando === 'agregar' ? 'Agregando…' : 'Agregar'}
+              </Boton>
+            </div>
+          </div>
+        )}
+      </div>
       <ResultadoDisponibilidad resultado={resultado} />
       <div className="grid gap-2.5">
         {puedeEditar && !confirmada && (
