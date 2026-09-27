@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import * as clienteService from './cliente.service.js';
+import { aRespuesta as aRespuestaServicio, INCLUIR_SERVICIO } from './servicio.service.js';
 
 // Información obligatoria para que la solicitud pueda pasar a cotización.
 const CAMPOS_PARA_COTIZAR = [
@@ -16,9 +17,7 @@ const INCLUIR_SOLICITUD = {
   cliente: { select: { id: true, nombre: true } },
   serviciosSeleccionados: {
     include: {
-      servicio: {
-        include: { tipoServicio: { select: { id: true, nombre: true, activo: true } } }
-      }
+      servicio: { include: INCLUIR_SERVICIO }
     },
     orderBy: { id: 'asc' }
   }
@@ -48,7 +47,8 @@ function calcularEstado(datos) {
 }
 
 export function aRespuesta(solicitud) {
-  const serviciosSeleccionados = (solicitud.serviciosSeleccionados || []).map(({ servicio }) => servicio);
+  const serviciosSeleccionados = (solicitud.serviciosSeleccionados || [])
+    .map(({ servicio }) => aRespuestaServicio(servicio));
   const respuesta = {
     ...solicitud,
     serviciosSeleccionados,
@@ -147,7 +147,7 @@ export async function agregarServicio(solicitudId, { servicioId }) {
 
   const servicio = await prisma.servicio.findUnique({
     where: { id: servicioId },
-    include: { tipoServicio: { select: { activo: true } } }
+    include: INCLUIR_SERVICIO
   });
   if (!servicio) {
     throw Object.assign(new Error('Servicio no encontrado.'), { status: 404 });
@@ -157,6 +157,9 @@ export async function agregarServicio(solicitudId, { servicioId }) {
   }
   if (!servicio.tipoServicio.activo) {
     throw Object.assign(new Error('El tipo del servicio seleccionado está inactivo.'), { status: 409 });
+  }
+  if (!servicio.versiones.length) {
+    throw Object.assign(new Error('El servicio seleccionado no tiene un precio vigente.'), { status: 409 });
   }
 
   const existente = solicitud.serviciosSeleccionados.some((seleccionado) => seleccionado.id === servicioId);

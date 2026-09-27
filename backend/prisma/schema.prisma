@@ -44,6 +44,17 @@ enum TipoPrecio {
   por_hora
 }
 
+enum EstadoCambioServicio {
+  pendiente
+  aprobado
+  rechazado
+}
+
+enum EstadoVersionServicio {
+  activo
+  inactivo
+}
+
 // Solicitud de evento. Los datos pueden faltar: en ese caso queda pendiente.
 model Solicitud {
   id                     Int                 @id @default(autoincrement())
@@ -82,20 +93,49 @@ model TipoServicio {
 
 // Servicio comercial asociado obligatoriamente a un tipo registrado.
 model Servicio {
-  id             Int                 @id @default(autoincrement())
+  id             Int                     @id @default(autoincrement())
   tipoServicioId Int
-  tipoServicio   TipoServicio        @relation(fields: [tipoServicioId], references: [id], onDelete: Restrict)
-  nombre         String              @db.VarChar(150)
-  descripcion    String?             @db.Text
-  tipoPrecio     TipoPrecio
-  precio         Int
-  activo         Boolean             @default(true)
+  tipoServicio   TipoServicio            @relation(fields: [tipoServicioId], references: [id], onDelete: Restrict)
+  nombre         String                  @db.VarChar(150)
+  descripcion    String?                 @db.Text
+  activo         Boolean                 @default(true)
+  versiones      VersionServicio[]
+  cambios        CambioServicio[]
   solicitudes    SolicitudServicio[]
-  createdAt      DateTime            @default(now()) @db.Timestamp(6)
-  updatedAt      DateTime            @updatedAt @db.Timestamp(6)
+  createdAt      DateTime                @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime                @updatedAt @db.Timestamp(6)
 
   @@index([tipoServicioId])
   @@map("servicios")
+}
+
+// Precio y modalidad que estuvieron vigentes para un servicio.
+model VersionServicio {
+  id             Int                   @id @default(autoincrement())
+  servicioId     Int
+  servicio       Servicio              @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  tipoPrecio     TipoPrecio
+  precio         Int
+  estado         EstadoVersionServicio @default(activo)
+  vigenciaDesde  DateTime              @db.Timestamp(6)
+  vigenciaHasta  DateTime?             @db.Timestamp(6)
+
+  @@index([servicioId, estado])
+  @@map("versiones_servicio")
+}
+
+// Nuevo precio o modalidad solicitado por Producción y Comercial.
+model CambioServicio {
+  id                   Int                  @id @default(autoincrement())
+  servicioId           Int
+  servicio             Servicio             @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  tipoPrecioNuevo      TipoPrecio
+  precioNuevo          Int
+  estado               EstadoCambioServicio @default(pendiente)
+
+  @@index([servicioId])
+  @@index([estado])
+  @@map("cambios_servicio")
 }
 
 // Relación explícita entre las solicitudes y los servicios seleccionados.

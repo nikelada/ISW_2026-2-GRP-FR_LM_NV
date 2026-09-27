@@ -5,31 +5,93 @@ function textoOpcional(valor) {
   return texto || null;
 }
 
-// El servicio siempre debe quedar asociado a un tipo existente; el servicio
-// valida esa existencia antes de escribir en la base de datos.
-export function validarServicio(req, res, next) {
-  const tipoServicioId = Number(req.body.tipoServicioId);
-  const nombre = String(req.body.nombre || '').trim();
-  const descripcion = textoOpcional(req.body.descripcion);
-  const tipoPrecio = String(req.body.tipoPrecio || '').trim();
-  const precio = Number(req.body.precio);
-  const activo = req.body.activo === undefined ? true : req.body.activo;
-  const errores = {};
+function datosBase(req) {
+  return {
+    tipoServicioId: Number(req.body.tipoServicioId),
+    nombre: String(req.body.nombre || '').trim(),
+    descripcion: textoOpcional(req.body.descripcion),
+    activo: req.body.activo === undefined ? true : req.body.activo
+  };
+}
 
-  if (!Number.isInteger(tipoServicioId) || tipoServicioId <= 0) {
+function validarBase(datos) {
+  const errores = {};
+  if (!Number.isInteger(datos.tipoServicioId) || datos.tipoServicioId <= 0) {
     errores.tipoServicioId = 'Selecciona un tipo de servicio válido.';
   }
-  if (!nombre) errores.nombre = 'El nombre es obligatorio.';
-  else if (nombre.length > 150) errores.nombre = 'El nombre no puede superar 150 caracteres.';
-  if (descripcion && descripcion.length > 1000) errores.descripcion = 'La descripción no puede superar 1000 caracteres.';
+  if (!datos.nombre) errores.nombre = 'El nombre es obligatorio.';
+  else if (datos.nombre.length > 150) errores.nombre = 'El nombre no puede superar 150 caracteres.';
+  if (datos.descripcion && datos.descripcion.length > 1000) {
+    errores.descripcion = 'La descripción no puede superar 1000 caracteres.';
+  }
+  if (typeof datos.activo !== 'boolean') errores.activo = 'El estado activo debe ser verdadero o falso.';
+  return errores;
+}
+
+// Al registrar un servicio se crea inmediatamente su primera versión vigente.
+export function validarServicio(req, res, next) {
+  const datos = datosBase(req);
+  const tipoPrecio = String(req.body.tipoPrecio || '').trim();
+  const precio = Number(req.body.precio);
+  const errores = validarBase(datos);
+
   if (!TIPOS_PRECIO.includes(tipoPrecio)) errores.tipoPrecio = 'El tipo de precio debe ser fijo o por_hora.';
   if (!Number.isInteger(precio) || precio <= 0) errores.precio = 'El precio debe ser un entero mayor que cero.';
-  if (typeof activo !== 'boolean') errores.activo = 'El estado activo debe ser verdadero o falso.';
 
   if (Object.keys(errores).length) {
     return res.status(400).json({ message: 'Revisa los datos del servicio.', errores });
   }
 
-  req.body = { tipoServicioId, nombre, descripcion, tipoPrecio, precio, activo };
+  req.body = { ...datos, tipoPrecio, precio };
+  next();
+}
+
+// Los cambios de precio y modalidad se tramitan mediante CambioServicio.
+export function validarActualizacionServicio(req, res, next) {
+  if (Object.hasOwn(req.body, 'precio') || Object.hasOwn(req.body, 'tipoPrecio')) {
+    return res.status(409).json({
+      message: 'Los cambios de precio o tipo de precio requieren aprobación de Gerencia.'
+    });
+  }
+
+  const datos = datosBase(req);
+  const errores = validarBase(datos);
+  if (Object.keys(errores).length) {
+    return res.status(400).json({ message: 'Revisa los datos del servicio.', errores });
+  }
+
+  req.body = datos;
+  next();
+}
+
+// Se permite proponer uno o ambos valores; el servicio completa el valor que
+// falte usando la versión vigente.
+export function validarCambioServicio(req, res, next) {
+  const incluyePrecio = Object.hasOwn(req.body, 'precio');
+  const incluyeTipoPrecio = Object.hasOwn(req.body, 'tipoPrecio');
+  const errores = {};
+  const datos = {};
+
+  if (!incluyePrecio && !incluyeTipoPrecio) {
+    return res.status(400).json({ message: 'Indica un nuevo precio o tipo de precio.' });
+  }
+
+  if (incluyePrecio) {
+    const precio = Number(req.body.precio);
+    if (!Number.isInteger(precio) || precio <= 0) errores.precio = 'El precio debe ser un entero mayor que cero.';
+    else datos.precio = precio;
+  }
+
+  if (incluyeTipoPrecio) {
+    const tipoPrecio = String(req.body.tipoPrecio || '').trim();
+    if (!TIPOS_PRECIO.includes(tipoPrecio)) errores.tipoPrecio = 'El tipo de precio debe ser fijo o por_hora.';
+    else datos.tipoPrecio = tipoPrecio;
+  }
+
+  if (Object.keys(errores).length) {
+    return res.status(400).json({ message: 'Revisa los datos del cambio.', errores });
+  }
+
+  req.body = datos;
   next();
 }
