@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { fechaActual } from '../utils/fecha.js';
 import * as tipoServicioService from './tipoServicio.service.js';
 
 export const INCLUIR_SERVICIO = {
@@ -62,7 +63,7 @@ async function asegurarTipoDisponible(tipoServicioId) {
 export async function crear(datos) {
   await asegurarTipoDisponible(datos.tipoServicioId);
   const { tipoPrecio, precio, ...datosServicio } = datos;
-  const vigenciaDesde = new Date();
+  const vigenciaDesde = fechaActual();
 
   const servicio = await prisma.$transaction(async (transaction) => {
     const creado = await transaction.servicio.create({ data: datosServicio });

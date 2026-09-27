@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { fechaActual } from '../utils/fecha.js';
 import * as servicioService from './servicio.service.js';
 
 const ESTADOS = ['pendiente', 'aprobado', 'rechazado'];
@@ -87,10 +88,10 @@ export async function aprobar(id) {
       throw Object.assign(new Error('El servicio no tiene una versión de precio activa.'), { status: 409 });
     }
 
-    const ahora = new Date();
+    const hoy = fechaActual();
     await transaction.versionServicio.update({
       where: { id: versionActiva.id },
-      data: { estado: 'inactivo', vigenciaHasta: ahora }
+      data: { estado: 'inactivo', vigenciaHasta: hoy }
     });
     await transaction.versionServicio.create({
       data: {
@@ -98,7 +99,7 @@ export async function aprobar(id) {
         tipoPrecio: cambio.tipoPrecioNuevo,
         precio: cambio.precioNuevo,
         estado: 'activo',
-        vigenciaDesde: ahora
+        vigenciaDesde: hoy
       }
     });
 
