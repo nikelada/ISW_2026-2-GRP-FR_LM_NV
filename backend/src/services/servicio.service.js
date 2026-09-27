@@ -24,7 +24,8 @@ export async function listar({ tipoServicioId, incluirInactivos = false } = {}) 
   const servicios = await prisma.servicio.findMany({
     where: {
       tipoServicioId: tipoServicioId || undefined,
-      activo: incluirInactivos ? undefined : true
+      activo: incluirInactivos ? undefined : true,
+      versiones: { some: { estado: 'activo' } }
     },
     include: INCLUIR_SERVICIO,
     orderBy: { nombre: 'asc' }
@@ -33,8 +34,11 @@ export async function listar({ tipoServicioId, incluirInactivos = false } = {}) 
 }
 
 async function obtenerModeloPorId(id) {
-  const servicio = await prisma.servicio.findUnique({
-    where: { id },
+  const servicio = await prisma.servicio.findFirst({
+    where: {
+      id,
+      versiones: { some: { estado: 'activo' } }
+    },
     include: INCLUIR_SERVICIO
   });
   if (!servicio) throw Object.assign(new Error('Servicio no encontrado.'), { status: 404 });
