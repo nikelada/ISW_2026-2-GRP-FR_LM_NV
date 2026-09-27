@@ -39,6 +39,11 @@ enum EstadoSolicitud {
   confirmado
 }
 
+enum TipoPrecio {
+  fijo
+  por_hora
+}
+
 // Solicitud de evento. Los datos pueden faltar: en ese caso queda pendiente.
 model Solicitud {
   id               Int             @id @default(autoincrement())
@@ -59,4 +64,34 @@ model Solicitud {
   @@index([clienteId])
   @@index([fecha])
   @@map("solicitudes")
+}
+
+// Categoría utilizada para agrupar los servicios ofrecidos.
+model TipoServicio {
+  id          Int        @id @default(autoincrement())
+  nombre      String     @unique @db.VarChar(100)
+  descripcion String?    @db.Text
+  activo      Boolean    @default(true)
+  servicios   Servicio[]
+  createdAt   DateTime   @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime   @updatedAt @db.Timestamp(6)
+
+  @@map("tipos_servicio")
+}
+
+// Servicio comercial asociado obligatoriamente a un tipo registrado.
+model Servicio {
+  id             Int          @id @default(autoincrement())
+  tipoServicioId Int
+  tipoServicio   TipoServicio @relation(fields: [tipoServicioId], references: [id], onDelete: Restrict)
+  nombre         String       @db.VarChar(150)
+  descripcion    String?      @db.Text
+  tipoPrecio     TipoPrecio
+  precio         Int
+  activo         Boolean      @default(true)
+  createdAt      DateTime     @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime     @updatedAt @db.Timestamp(6)
+
+  @@index([tipoServicioId])
+  @@map("servicios")
 }
