@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import CambiosPrecio from '../components/CambiosPrecio.jsx';
 import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
@@ -11,7 +12,7 @@ import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
 import * as servicioService from '../services/servicioService.js';
 import * as tipoServicioService from '../services/tipoServicioService.js';
-import { esProduccion } from '../utils/roles.js';
+import { esGerencia, esProduccion } from '../utils/roles.js';
 
 const TIPO_VACIO = { nombre: '', descripcion: '' };
 const SERVICIO_VACIO = {
@@ -21,6 +22,7 @@ const SERVICIO_VACIO = {
   precio: '',
   tipoPrecio: 'fijo'
 };
+const CAMBIO_PRECIO_VACIO = { precio: '', tipoPrecio: 'fijo' };
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
   style: 'currency',
@@ -59,15 +61,20 @@ const columnasTipos = [
 
 export default function ServiciosPage({ user }) {
   const puedeEditar = esProduccion(user);
+  const puedeRevisarCambios = esGerencia(user);
   const [vista, setVista] = useState('servicios');
   const [tipoServicioId, setTipoServicioId] = useState('');
   const [seleccionado, setSeleccionado] = useState(null);
   const [creandoServicio, setCreandoServicio] = useState(false);
   const [editandoServicio, setEditandoServicio] = useState(false);
+  const [cambiandoPrecio, setCambiandoPrecio] = useState(false);
   const [formServicio, setFormServicio] = useState(SERVICIO_VACIO);
+  const [formCambioPrecio, setFormCambioPrecio] = useState(CAMBIO_PRECIO_VACIO);
   const [erroresServicio, setErroresServicio] = useState({});
+  const [erroresCambioPrecio, setErroresCambioPrecio] = useState({});
   const [avisoServicio, setAvisoServicio] = useState(null);
   const [guardandoServicio, setGuardandoServicio] = useState(false);
+  const [guardandoCambioPrecio, setGuardandoCambioPrecio] = useState(false);
   const [creandoTipo, setCreandoTipo] = useState(false);
   const [formTipo, setFormTipo] = useState(TIPO_VACIO);
   const [erroresTipo, setErroresTipo] = useState({});
@@ -107,12 +114,14 @@ export default function ServiciosPage({ user }) {
     });
   }, [serviciosFiltrados]);
 
-  function cambiarVista() {
-    setVista(vista === 'servicios' ? 'tipos' : 'servicios');
+  function mostrarVista(nuevaVista) {
+    setVista(nuevaVista);
     setCreandoServicio(false);
     setEditandoServicio(false);
+    setCambiandoPrecio(false);
     setCreandoTipo(false);
     setErroresServicio({});
+    setErroresCambioPrecio({});
     setErroresTipo({});
     setAvisoServicio(null);
     setAvisoTipo(null);
@@ -124,20 +133,25 @@ export default function ServiciosPage({ user }) {
     setAvisoServicio(null);
     setCreandoServicio(true);
     setEditandoServicio(false);
+    setCambiandoPrecio(false);
   }
 
   function seleccionarServicio(servicio) {
     setSeleccionado(servicio);
     setCreandoServicio(false);
     setEditandoServicio(false);
+    setCambiandoPrecio(false);
     setErroresServicio({});
+    setErroresCambioPrecio({});
     setAvisoServicio(null);
   }
 
   function cancelarServicio() {
     setCreandoServicio(false);
     setEditandoServicio(false);
+    setCambiandoPrecio(false);
     setErroresServicio({});
+    setErroresCambioPrecio({});
   }
 
   function editarServicio() {
@@ -151,6 +165,44 @@ export default function ServiciosPage({ user }) {
     setAvisoServicio(null);
     setCreandoServicio(false);
     setEditandoServicio(true);
+    setCambiandoPrecio(false);
+  }
+
+  function editarPrecio() {
+    setFormCambioPrecio({
+      precio: String(seleccionado.versionActiva.precio),
+      tipoPrecio: seleccionado.versionActiva.tipoPrecio
+    });
+    setErroresCambioPrecio({});
+    setAvisoServicio(null);
+    setCreandoServicio(false);
+    setEditandoServicio(false);
+    setCambiandoPrecio(true);
+  }
+
+  function cancelarCambioPrecio() {
+    setCambiandoPrecio(false);
+    setErroresCambioPrecio({});
+  }
+
+  async function guardarCambioPrecio(event) {
+    event.preventDefault();
+    setGuardandoCambioPrecio(true);
+    setAvisoServicio(null);
+    try {
+      await servicioService.solicitarCambio(seleccionado.id, formCambioPrecio);
+      setCambiandoPrecio(false);
+      setErroresCambioPrecio({});
+      setAvisoServicio({
+        tipo: 'success',
+        texto: `El cambio de precio de «${seleccionado.nombre}» fue enviado a Gerencia.`
+      });
+    } catch (error) {
+      setErroresCambioPrecio(error.data?.errores || {});
+      setAvisoServicio({ tipo: 'error', texto: error.message });
+    } finally {
+      setGuardandoCambioPrecio(false);
+    }
   }
 
   async function guardarServicio(event) {
@@ -221,17 +273,23 @@ export default function ServiciosPage({ user }) {
     <>
       <EncabezadoPagina
         antetitulo="Gestión"
-        titulo={vista === 'servicios' ? 'Servicios' : 'Tipos de servicio'}
+        titulo={vista === 'servicios'
+          ? 'Servicios'
+          : vista === 'tipos' ? 'Tipos de servicio' : 'Cambios de precio'}
         descripcion={vista === 'servicios'
           ? 'Servicios disponibles y su precio actual.'
-          : 'Tipos utilizados para organizar los servicios disponibles.'}
+          : vista === 'tipos'
+            ? 'Tipos utilizados para organizar los servicios disponibles.'
+            : 'Solicitudes pendientes de aprobación para precios y modalidades de cobro.'}
       >
         <div className="flex gap-2.5">
           {vista === 'servicios' && puedeEditar && <Boton onClick={nuevoServicio}>Nuevo servicio</Boton>}
           {vista === 'tipos' && puedeEditar && <Boton onClick={nuevoTipo}>Nuevo tipo de servicio</Boton>}
-          <Boton variante="secundario" onClick={cambiarVista}>
-            {vista === 'servicios' ? 'Tipos de servicio' : 'Ver servicios'}
-          </Boton>
+          {vista !== 'servicios' && <Boton variante="secundario" onClick={() => mostrarVista('servicios')}>Ver servicios</Boton>}
+          {puedeRevisarCambios && vista === 'servicios' && (
+            <Boton variante="secundario" onClick={() => mostrarVista('cambios')}>Cambios de precio</Boton>
+          )}
+          {vista !== 'tipos' && <Boton variante="secundario" onClick={() => mostrarVista('tipos')}>Tipos de servicio</Boton>}
         </div>
       </EncabezadoPagina>
 
@@ -283,6 +341,8 @@ export default function ServiciosPage({ user }) {
             </Panel>
           )}
         </div>
+      ) : vista === 'cambios' ? (
+        <CambiosPrecio user={user} />
       ) : (
         <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
           <Panel>
@@ -300,7 +360,7 @@ export default function ServiciosPage({ user }) {
           {(errorTipos || errorServicios) && (
             <Aviso tipo="error" className="m-3.5">{errorTipos || errorServicios}</Aviso>
           )}
-          {avisoServicio && !creandoServicio && !editandoServicio && (
+          {avisoServicio && !creandoServicio && !editandoServicio && !cambiandoPrecio && (
             <Aviso tipo={avisoServicio.tipo} className="m-3.5">{avisoServicio.texto}</Aviso>
           )}
           {cargando && !servicios.length
@@ -329,11 +389,22 @@ export default function ServiciosPage({ user }) {
                 onCancelar={cancelarServicio}
                 editando={editandoServicio}
               />
+            ) : cambiandoPrecio ? (
+              <FormularioCambioPrecio
+                form={formCambioPrecio}
+                setForm={setFormCambioPrecio}
+                errores={erroresCambioPrecio}
+                aviso={avisoServicio}
+                guardando={guardandoCambioPrecio}
+                onGuardar={guardarCambioPrecio}
+                onCancelar={cancelarCambioPrecio}
+              />
             ) : (
               <DetalleServicio
                 servicio={seleccionado}
                 puedeEditar={puedeEditar}
                 onEditar={editarServicio}
+                onEditarPrecio={editarPrecio}
               />
             )}
           </Panel>
@@ -374,20 +445,9 @@ function FormularioServicio({ tipos, form, setForm, errores, aviso, guardando, o
         {!editando && (
           <>
             <Campo etiqueta="Precio" error={errores.precio}>
-              <input
-                type="number"
-                min="1"
-                max="10000000"
-                step="1"
-                className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                name="precio"
+              <InputPrecio
                 value={form.precio}
-                onKeyDown={(event) => {
-                  if (['-', '+', 'e', 'E', '.', ','].includes(event.key)) event.preventDefault();
-                }}
-                onChange={(event) => {
-                  if (/^\d*$/.test(event.target.value)) setForm({ ...form, precio: event.target.value });
-                }}
+                onChange={(precio) => setForm({ ...form, precio })}
               />
             </Campo>
             <Campo etiqueta="Cobro" error={errores.tipoPrecio}>
@@ -410,7 +470,62 @@ function FormularioServicio({ tipos, form, setForm, errores, aviso, guardando, o
   );
 }
 
-function DetalleServicio({ servicio, puedeEditar, onEditar }) {
+function FormularioCambioPrecio({ form, setForm, errores, aviso, guardando, onGuardar, onCancelar }) {
+  return (
+    <>
+      <Antetitulo className="mb-2">Cambio sujeto a aprobación</Antetitulo>
+      <h2 className="mb-4 text-xl font-bold">Editar precio</h2>
+      {aviso && <Aviso tipo={aviso.tipo}>{aviso.texto}</Aviso>}
+      <form className="grid gap-4" onSubmit={onGuardar} noValidate>
+        <Campo etiqueta="Precio" error={errores.precio}>
+          <InputPrecio
+            value={form.precio}
+            onChange={(precio) => setForm({ ...form, precio })}
+          />
+        </Campo>
+        <Campo etiqueta="Cobro" error={errores.tipoPrecio}>
+          <select
+            name="tipoPrecio"
+            value={form.tipoPrecio}
+            onChange={(event) => setForm({ ...form, tipoPrecio: event.target.value })}
+          >
+            <option value="fijo">Precio fijo</option>
+            <option value="por_hora">Por hora</option>
+          </select>
+        </Campo>
+        <p className="text-xs text-stone-500">El cambio se aplicará solamente si Gerencia lo aprueba.</p>
+        <div className="flex gap-2.5">
+          <Boton type="submit" className="flex-1" disabled={guardando}>
+            <span>{guardando ? 'Enviando…' : 'Enviar a Gerencia'}</span><span aria-hidden="true">→</span>
+          </Boton>
+          <Boton variante="secundario" onClick={onCancelar}>Cancelar</Boton>
+        </div>
+      </form>
+    </>
+  );
+}
+
+function InputPrecio({ value, onChange }) {
+  return (
+    <input
+      type="number"
+      min="1"
+      max="10000000"
+      step="1"
+      className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      name="precio"
+      value={value}
+      onKeyDown={(event) => {
+        if (['-', '+', 'e', 'E', '.', ','].includes(event.key)) event.preventDefault();
+      }}
+      onChange={(event) => {
+        if (/^\d*$/.test(event.target.value)) onChange(event.target.value);
+      }}
+    />
+  );
+}
+
+function DetalleServicio({ servicio, puedeEditar, onEditar, onEditarPrecio }) {
   if (!servicio) {
     return (
       <>
@@ -431,7 +546,12 @@ function DetalleServicio({ servicio, puedeEditar, onEditar }) {
         ['Cobro', labelTipoPrecio(version?.tipoPrecio)]
       ]} />
       {!version && <Aviso tipo="warning">Este servicio no tiene una versión de precio activa.</Aviso>}
-      {puedeEditar && <Boton onClick={onEditar}>Editar servicio</Boton>}
+      {puedeEditar && (
+        <div className="flex gap-2.5">
+          <Boton className="flex-1" onClick={onEditar}><span className="block w-full text-center">Editar servicio</span></Boton>
+          <Boton className="flex-1" variante="secundario" onClick={onEditarPrecio}><span className="block w-full text-center">Editar precio</span></Boton>
+        </div>
+      )}
     </>
   );
 }
