@@ -17,7 +17,8 @@ const INCLUIR_SOLICITUD = {
   cliente: { select: { id: true, nombre: true } },
   serviciosSeleccionados: {
     include: {
-      servicio: { include: INCLUIR_SERVICIO }
+      servicio: { include: INCLUIR_SERVICIO },
+      versionServicio: true
     },
     orderBy: { id: 'asc' }
   }
@@ -48,7 +49,10 @@ function calcularEstado(datos) {
 
 export function aRespuesta(solicitud) {
   const serviciosSeleccionados = (solicitud.serviciosSeleccionados || [])
-    .map(({ servicio }) => aRespuestaServicio(servicio));
+    .map(({ servicio, versionServicio }) => ({
+      ...aRespuestaServicio(servicio),
+      versionServicio
+    }));
   const respuesta = {
     ...solicitud,
     serviciosSeleccionados,
@@ -158,8 +162,9 @@ export async function agregarServicio(solicitudId, { servicioId }) {
   if (!servicio.tipoServicio.activo) {
     throw Object.assign(new Error('El tipo del servicio seleccionado está inactivo.'), { status: 409 });
   }
-  if (!servicio.versiones.length) {
-    throw Object.assign(new Error('El servicio seleccionado no tiene un precio vigente.'), { status: 409 });
+  const [versionActiva] = servicio.versiones;
+  if (!versionActiva) {
+    throw Object.assign(new Error('El servicio seleccionado no tiene una versión de precio activa.'), { status: 409 });
   }
 
   const existente = solicitud.serviciosSeleccionados.some((seleccionado) => seleccionado.id === servicioId);
@@ -168,7 +173,9 @@ export async function agregarServicio(solicitudId, { servicioId }) {
   }
 
   const actualizada = await prisma.$transaction(async (transaction) => {
-    await transaction.solicitudServicio.create({ data: { solicitudId, servicioId } });
+    await transaction.solicitudServicio.create({
+      data: { solicitudId, servicioId, versionServicioId: versionActiva.id }
+    });
 
     const solicitudConServicio = await transaction.solicitud.findUnique({
       where: { id: solicitudId },

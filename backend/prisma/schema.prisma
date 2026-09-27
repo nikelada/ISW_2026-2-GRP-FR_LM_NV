@@ -119,6 +119,7 @@ model VersionServicio {
   estado         EstadoVersionServicio @default(activo)
   vigenciaDesde  DateTime              @db.Timestamp(6)
   vigenciaHasta  DateTime?             @db.Timestamp(6)
+  solicitudes    SolicitudServicio[]
 
   @@index([servicioId, estado])
   @@map("versiones_servicio")
@@ -140,13 +141,16 @@ model CambioServicio {
 
 // Relación explícita entre las solicitudes y los servicios seleccionados.
 model SolicitudServicio {
-  id          Int       @id @default(autoincrement())
-  solicitudId Int
-  servicioId  Int
-  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
-  servicio    Servicio  @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  id                Int             @id @default(autoincrement())
+  solicitudId       Int
+  servicioId        Int
+  versionServicioId Int
+  solicitud         Solicitud       @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  servicio          Servicio        @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  versionServicio   VersionServicio @relation(fields: [versionServicioId], references: [id], onDelete: Restrict)
 
   @@unique([solicitudId, servicioId])
   @@index([servicioId])
+  @@index([versionServicioId])
   @@map("solicitudes_servicios")
 }
