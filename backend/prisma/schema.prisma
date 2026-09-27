@@ -117,8 +117,8 @@ model VersionServicio {
   tipoPrecio     TipoPrecio
   precio         Int
   estado         EstadoVersionServicio @default(activo)
-  vigenciaDesde  DateTime              @db.Timestamp(6)
-  vigenciaHasta  DateTime?             @db.Timestamp(6)
+  vigenciaDesde  DateTime              @db.Date
+  vigenciaHasta  DateTime?             @db.Date
   solicitudes    SolicitudServicio[]
 
   @@index([servicioId, estado])
