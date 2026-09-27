@@ -21,7 +21,8 @@ function validarBase(datos) {
   }
   if (!datos.nombre) errores.nombre = 'El nombre es obligatorio.';
   else if (datos.nombre.length > 150) errores.nombre = 'El nombre no puede superar 150 caracteres.';
-  if (datos.descripcion && datos.descripcion.length > 1000) {
+  if (!datos.descripcion) errores.descripcion = 'La descripción es obligatoria.';
+  else if (datos.descripcion.length > 1000) {
     errores.descripcion = 'La descripción no puede superar 1000 caracteres.';
   }
   if (typeof datos.activo !== 'boolean') errores.activo = 'El estado activo debe ser verdadero o falso.';
