@@ -8,11 +8,21 @@ const CAMPOS_PARA_COTIZAR = [
   { campo: 'horaFin', etiqueta: 'Hora de término' },
   { campo: 'cantidadPersonas', etiqueta: 'Cantidad de personas' },
   { campo: 'lugar', etiqueta: 'Lugar' },
-  { campo: 'servicios', etiqueta: 'Servicios necesarios' }
+  { campo: 'serviciosSeleccionados', etiqueta: 'Servicios necesarios' }
 ];
 
 const ESTADOS = ['pendiente', 'disponible_cotizar', 'confirmado'];
-const INCLUIR_CLIENTE = { cliente: { select: { id: true, nombre: true } } };
+const INCLUIR_SOLICITUD = {
+  cliente: { select: { id: true, nombre: true } },
+  serviciosSeleccionados: {
+    include: {
+      servicio: {
+        include: { tipoServicio: { select: { id: true, nombre: true, activo: true } } }
+      }
+    },
+    orderBy: { id: 'asc' }
+  }
+};
 
 // Prisma representa DATE y TIME de PostgreSQL como Date en UTC.
 export const aFecha = (texto) => (texto ? new Date(`${texto}T00:00:00Z`) : null);
@@ -22,7 +32,13 @@ const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
 
 export function camposFaltantes(solicitud) {
   return CAMPOS_PARA_COTIZAR
-    .filter(({ campo }) => solicitud[campo] === null || solicitud[campo] === undefined || solicitud[campo] === '')
+    .filter(({ campo }) => {
+      if (campo === 'serviciosSeleccionados') {
+        const seleccionados = solicitud.serviciosSeleccionados?.length || 0;
+        return seleccionados === 0 && !solicitud.servicios;
+      }
+      return solicitud[campo] === null || solicitud[campo] === undefined || solicitud[campo] === '';
+    })
     .map(({ etiqueta }) => etiqueta);
 }
 
@@ -32,8 +48,10 @@ function calcularEstado(datos) {
 }
 
 export function aRespuesta(solicitud) {
+  const serviciosSeleccionados = (solicitud.serviciosSeleccionados || []).map(({ servicio }) => servicio);
   const respuesta = {
     ...solicitud,
+    serviciosSeleccionados,
     fecha: textoFecha(solicitud.fecha),
     horaInicio: textoHora(solicitud.horaInicio),
     horaFin: textoHora(solicitud.horaFin)
@@ -42,7 +60,7 @@ export function aRespuesta(solicitud) {
   return respuesta;
 }
 
-function aDatos(datos) {
+function aDatos(datos, serviciosSeleccionados = []) {
   return {
     clienteId: datos.clienteId,
     fecha: aFecha(datos.fecha),
@@ -51,7 +69,7 @@ function aDatos(datos) {
     cantidadPersonas: datos.cantidadPersonas,
     lugar: datos.lugar,
     servicios: datos.servicios,
-    estado: calcularEstado(datos)
+    estado: calcularEstado({ ...datos, serviciosSeleccionados })
   };
 }
 
@@ -74,7 +92,7 @@ export async function listar({ estado, clienteId } = {}) {
   }
   const solicitudes = await prisma.solicitud.findMany({
     where: { estado: estado || undefined, clienteId: clienteId || undefined },
-    include: INCLUIR_CLIENTE,
+    include: INCLUIR_SOLICITUD,
     orderBy: { createdAt: 'desc' }
   });
   return solicitudes.map(aRespuesta);
@@ -89,14 +107,14 @@ export function listarParaCotizar() {
 }
 
 export async function obtenerPorId(id) {
-  const solicitud = await prisma.solicitud.findUnique({ where: { id }, include: INCLUIR_CLIENTE });
+  const solicitud = await prisma.solicitud.findUnique({ where: { id }, include: INCLUIR_SOLICITUD });
   if (!solicitud) throw Object.assign(new Error('Solicitud no encontrada.'), { status: 404 });
   return aRespuesta(solicitud);
 }
 
 export async function crear(datos) {
   await asegurarClienteRegistrado(datos.clienteId);
-  const creada = await prisma.solicitud.create({ data: aDatos(datos), include: INCLUIR_CLIENTE });
+  const creada = await prisma.solicitud.create({ data: aDatos(datos), include: INCLUIR_SOLICITUD });
   return aRespuesta(creada);
 }
 
@@ -108,11 +126,63 @@ export async function actualizar(id, datos) {
   }
   if (datos.clienteId !== actual.clienteId) await asegurarClienteRegistrado(datos.clienteId);
 
-  const data = aDatos(datos);
+  const data = aDatos(datos, actual.serviciosSeleccionados);
   // Si cambia la fecha o el horario, la disponibilidad debe revisarse de nuevo.
   if (datos.fecha !== actual.fecha || datos.horaInicio !== actual.horaInicio || datos.horaFin !== actual.horaFin) {
     data.fechaHabilitada = false;
   }
-  const actualizada = await prisma.solicitud.update({ where: { id }, data, include: INCLUIR_CLIENTE });
+  const actualizada = await prisma.solicitud.update({ where: { id }, data, include: INCLUIR_SOLICITUD });
+  return aRespuesta(actualizada);
+}
+
+// Asocia un servicio del catálogo sin calcular valores; ese cálculo pertenece
+// al proceso posterior de cotización.
+export async function agregarServicio(solicitudId, { servicioId }) {
+  const solicitud = await obtenerPorId(solicitudId);
+  if (solicitud.estado === 'confirmado') {
+    throw Object.assign(new Error('El evento ya está confirmado; no se pueden agregar servicios a la solicitud.'), {
+      status: 409
+    });
+  }
+
+  const servicio = await prisma.servicio.findUnique({
+    where: { id: servicioId },
+    include: { tipoServicio: { select: { activo: true } } }
+  });
+  if (!servicio) {
+    throw Object.assign(new Error('Servicio no encontrado.'), { status: 404 });
+  }
+  if (!servicio.activo) {
+    throw Object.assign(new Error('El servicio seleccionado está inactivo.'), { status: 409 });
+  }
+  if (!servicio.tipoServicio.activo) {
+    throw Object.assign(new Error('El tipo del servicio seleccionado está inactivo.'), { status: 409 });
+  }
+
+  const existente = solicitud.serviciosSeleccionados.some((seleccionado) => seleccionado.id === servicioId);
+  if (existente) {
+    throw Object.assign(new Error('El servicio ya está agregado a la solicitud.'), { status: 409 });
+  }
+
+  const actualizada = await prisma.$transaction(async (transaction) => {
+    await transaction.solicitudServicio.create({ data: { solicitudId, servicioId } });
+
+    const solicitudConServicio = await transaction.solicitud.findUnique({
+      where: { id: solicitudId },
+      include: INCLUIR_SOLICITUD
+    });
+    const estado = calcularEstado(solicitudConServicio);
+
+    if (estado !== solicitudConServicio.estado) {
+      return transaction.solicitud.update({
+        where: { id: solicitudId },
+        data: { estado },
+        include: INCLUIR_SOLICITUD
+      });
+    }
+
+    return solicitudConServicio;
+  });
+
   return aRespuesta(actualizada);
 }

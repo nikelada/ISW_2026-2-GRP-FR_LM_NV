@@ -46,20 +46,21 @@ enum TipoPrecio {
 
 // Solicitud de evento. Los datos pueden faltar: en ese caso queda pendiente.
 model Solicitud {
-  id               Int             @id @default(autoincrement())
-  clienteId        Int
-  cliente          Cliente         @relation(fields: [clienteId], references: [id], onDelete: Restrict)
-  fecha            DateTime?       @db.Date
-  horaInicio       DateTime?       @db.Time(0)
-  horaFin          DateTime?       @db.Time(0)
-  cantidadPersonas Int?
-  lugar            String?         @db.VarChar(255)
-  servicios        String?         @db.Text
-  estado           EstadoSolicitud @default(pendiente)
+  id                     Int                 @id @default(autoincrement())
+  clienteId              Int
+  cliente                Cliente             @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  fecha                  DateTime?           @db.Date
+  horaInicio             DateTime?           @db.Time(0)
+  horaFin                DateTime?           @db.Time(0)
+  cantidadPersonas       Int?
+  lugar                  String?             @db.VarChar(255)
+  servicios              String?             @db.Text
+  serviciosSeleccionados SolicitudServicio[]
+  estado                 EstadoSolicitud     @default(pendiente)
   // La fecha y horario fueron revisados sin conflicto y pueden continuar a confirmación.
-  fechaHabilitada  Boolean         @default(false)
-  createdAt        DateTime        @default(now()) @db.Timestamp(6)
-  updatedAt        DateTime        @updatedAt @db.Timestamp(6)
+  fechaHabilitada        Boolean             @default(false)
+  createdAt              DateTime            @default(now()) @db.Timestamp(6)
+  updatedAt              DateTime            @updatedAt @db.Timestamp(6)
 
   @@index([clienteId])
   @@index([fecha])
@@ -81,17 +82,31 @@ model TipoServicio {
 
 // Servicio comercial asociado obligatoriamente a un tipo registrado.
 model Servicio {
-  id             Int          @id @default(autoincrement())
+  id             Int                 @id @default(autoincrement())
   tipoServicioId Int
-  tipoServicio   TipoServicio @relation(fields: [tipoServicioId], references: [id], onDelete: Restrict)
-  nombre         String       @db.VarChar(150)
-  descripcion    String?      @db.Text
+  tipoServicio   TipoServicio        @relation(fields: [tipoServicioId], references: [id], onDelete: Restrict)
+  nombre         String              @db.VarChar(150)
+  descripcion    String?             @db.Text
   tipoPrecio     TipoPrecio
   precio         Int
-  activo         Boolean      @default(true)
-  createdAt      DateTime     @default(now()) @db.Timestamp(6)
-  updatedAt      DateTime     @updatedAt @db.Timestamp(6)
+  activo         Boolean             @default(true)
+  solicitudes    SolicitudServicio[]
+  createdAt      DateTime            @default(now()) @db.Timestamp(6)
+  updatedAt      DateTime            @updatedAt @db.Timestamp(6)
 
   @@index([tipoServicioId])
   @@map("servicios")
+}
+
+// Relación explícita entre las solicitudes y los servicios seleccionados.
+model SolicitudServicio {
+  id          Int       @id @default(autoincrement())
+  solicitudId Int
+  servicioId  Int
+  solicitud   Solicitud @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  servicio    Servicio  @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+
+  @@unique([solicitudId, servicioId])
+  @@index([servicioId])
+  @@map("solicitudes_servicios")
 }
