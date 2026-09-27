@@ -40,8 +40,8 @@ enum EstadoSolicitud {
 }
 
 enum TipoPrecio {
-  fijo
-  por_hora
+  fijo     @map("Precio fijo")
+  por_hora @map("Por hora")
 }
 
 enum EstadoCambioServicio {
