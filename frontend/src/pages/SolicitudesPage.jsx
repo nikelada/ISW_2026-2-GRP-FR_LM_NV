@@ -20,6 +20,22 @@ import { esProduccion } from '../utils/roles.js';
 
 const VACIO = { clienteId: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '' };
 
+const formatoPrecio = new Intl.NumberFormat('es-CL', {
+  style: 'currency',
+  currency: 'CLP',
+  maximumFractionDigits: 0
+});
+
+const LABEL_TIPO_PRECIO = {
+  fijo: 'precio fijo',
+  por_hora: 'por hora'
+};
+
+function textoPrecioServicio(version) {
+  if (!version) return 'Precio pendiente';
+  return `${formatoPrecio.format(version.precio)} ${LABEL_TIPO_PRECIO[version.tipoPrecio] || version.tipoPrecio}`;
+}
+
 const sinDato = (texto = '—') => <span className="text-xs text-amber-700">{texto}</span>;
 
 const columnas = [
@@ -290,6 +306,7 @@ function DetalleSolicitud({
   const serviciosDelTipo = opcionesDisponibles.filter(
     (servicio) => servicio.tipoServicioId === Number(tipoServicioParaAgregar)
   );
+  const servicioSeleccionado = serviciosDelTipo.find((servicio) => servicio.id === Number(servicioParaAgregar));
   return (
     <>
       <Antetitulo className="mb-2">Solicitud #{s.id}</Antetitulo>
@@ -321,7 +338,10 @@ function DetalleSolicitud({
           <ul className="mb-3 grid gap-2 text-sm">
             {servicios.map((servicio) => (
               <li key={servicio.id} className="flex items-center justify-between gap-3 rounded-md bg-stone-50 px-3 py-2">
-                <span className="font-medium">{servicio.nombre}</span>
+                <div className="min-w-0">
+                  <span className="block font-medium">{servicio.nombre}</span>
+                  <span className="block text-xs text-stone-500">{textoPrecioServicio(servicio.versionServicio)}</span>
+                </div>
                 {puedeEditar && !confirmada && (
                   <Boton
                     variante="enlace"
@@ -347,23 +367,29 @@ function DetalleSolicitud({
               <option value="">Selecciona un tipo de servicio</option>
               {tiposDisponibles.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.nombre}</option>)}
             </select>
-            <div className="flex gap-2.5">
-              <select
-                className="min-w-0 flex-1"
-                aria-label="Servicio para agregar"
-                value={servicioParaAgregar}
-                onChange={(event) => onServicioParaAgregar(event.target.value)}
-                disabled={!tipoServicioParaAgregar || !serviciosDelTipo.length || Boolean(servicioProcesando)}
-              >
-                <option value="">
-                  {tipoServicioParaAgregar && !serviciosDelTipo.length
-                    ? 'No hay más servicios disponibles de este tipo'
-                    : 'Selecciona un servicio activo'}
-                </option>
-                {serviciosDelTipo.map((servicio) => <option key={servicio.id} value={servicio.id}>{servicio.nombre}</option>)}
-              </select>
+            <div className="flex items-start gap-2.5">
+              <div className="min-w-0 flex-1">
+                <select
+                  className="h-10 w-full"
+                  aria-label="Servicio para agregar"
+                  value={servicioParaAgregar}
+                  onChange={(event) => onServicioParaAgregar(event.target.value)}
+                  disabled={!tipoServicioParaAgregar || !serviciosDelTipo.length || Boolean(servicioProcesando)}
+                >
+                  <option value="">
+                    {tipoServicioParaAgregar && !serviciosDelTipo.length
+                      ? 'No hay más servicios disponibles de este tipo'
+                      : 'Selecciona un servicio activo'}
+                  </option>
+                  {serviciosDelTipo.map((servicio) => <option key={servicio.id} value={servicio.id}>{servicio.nombre}</option>)}
+                </select>
+                {servicioSeleccionado && (
+                  <p className="mt-1 text-xs text-stone-500">{textoPrecioServicio(servicioSeleccionado.versionActiva)}</p>
+                )}
+              </div>
               <Boton
                 variante="secundario"
+                className="h-10 shrink-0"
                 disabled={!servicioParaAgregar || Boolean(servicioProcesando)}
                 onClick={onAgregarServicio}
               >
@@ -372,6 +398,10 @@ function DetalleSolicitud({
             </div>
           </div>
         )}
+        <div className="mt-2 flex items-center justify-between border-t border-stone-200 pt-3 text-sm">
+          <span className="text-stone-500">Costo estimado</span>
+          <strong>Pendiente de cálculo</strong>
+        </div>
       </div>
       <ResultadoDisponibilidad resultado={resultado} />
       <div className="grid gap-2.5">
