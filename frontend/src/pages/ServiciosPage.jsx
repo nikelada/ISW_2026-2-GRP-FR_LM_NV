@@ -17,6 +17,13 @@ const formatoPrecio = new Intl.NumberFormat('es-CL', {
   maximumFractionDigits: 0
 });
 
+const LABEL_TIPO_PRECIO = {
+  fijo: 'Precio fijo',
+  por_hora: 'Por hora'
+};
+
+const labelTipoPrecio = (tipoPrecio) => LABEL_TIPO_PRECIO[tipoPrecio] || tipoPrecio || '—';
+
 const columnas = [
   { campo: 'nombre', titulo: 'Servicio', render: (s) => <strong>{s.nombre}</strong> },
   { campo: 'tipoServicio', titulo: 'Tipo', render: (s) => s.tipoServicio.nombre },
@@ -29,7 +36,7 @@ const columnas = [
   {
     campo: 'tipoPrecio',
     titulo: 'Cobro',
-    render: (s) => s.versionActiva?.tipoPrecio || '—'
+    render: (s) => labelTipoPrecio(s.versionActiva?.tipoPrecio)
   }
 ];
 
@@ -115,7 +122,7 @@ function DetalleServicio({ servicio }) {
       <ListaDatos datos={[
         ['Descripción', servicio.descripcion || '—'],
         ['Precio', version ? formatoPrecio.format(version.precio) : '—'],
-        ['Cobro', version?.tipoPrecio || '—']
+        ['Cobro', labelTipoPrecio(version?.tipoPrecio)]
       ]} />
       {!version && <Aviso tipo="warning">Este servicio no tiene una versión de precio activa.</Aviso>}
     </>
