@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Badge from '../components/ui/Badge.jsx';
+import Boton from '../components/ui/Boton.jsx';
 import ListaDatos from '../components/ui/ListaDatos.jsx';
 import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
@@ -24,7 +25,7 @@ const LABEL_TIPO_PRECIO = {
 
 const labelTipoPrecio = (tipoPrecio) => LABEL_TIPO_PRECIO[tipoPrecio] || tipoPrecio || '—';
 
-const columnas = [
+const columnasServicios = [
   { campo: 'nombre', titulo: 'Servicio', render: (s) => <strong>{s.nombre}</strong> },
   { campo: 'tipoServicio', titulo: 'Tipo', render: (s) => s.tipoServicio.nombre },
   {
@@ -40,34 +41,77 @@ const columnas = [
   }
 ];
 
+const columnasTipos = [
+  { campo: 'nombre', titulo: 'Tipo de servicio', render: (tipo) => <strong>{tipo.nombre}</strong> },
+  { campo: 'descripcion', titulo: 'Descripción', render: (tipo) => tipo.descripcion || '—' },
+  { campo: 'cantidadServicios', titulo: 'Servicios' }
+];
+
 export default function ServiciosPage() {
+  const [vista, setVista] = useState('servicios');
   const [tipoServicioId, setTipoServicioId] = useState('');
   const [seleccionado, setSeleccionado] = useState(null);
-  const { datos: tipos, error: errorTipos } = useFetch(useCallback(() => tipoServicioService.listar(), []));
+  const {
+    datos: tipos,
+    cargando: cargandoTipos,
+    error: errorTipos
+  } = useFetch(useCallback(() => tipoServicioService.listar(), []));
   const {
     datos: servicios,
     cargando,
     error: errorServicios
-  } = useFetch(useCallback(
-    () => servicioService.listar({ tipoServicioId }),
-    [tipoServicioId]
-  ));
+  } = useFetch(useCallback(() => servicioService.listar(), []));
+
+  const serviciosFiltrados = useMemo(
+    () => (tipoServicioId
+      ? servicios.filter((servicio) => servicio.tipoServicioId === Number(tipoServicioId))
+      : servicios),
+    [servicios, tipoServicioId]
+  );
+  const tiposConCantidad = useMemo(
+    () => tipos.map((tipo) => ({
+      ...tipo,
+      cantidadServicios: servicios.filter((servicio) => servicio.tipoServicioId === tipo.id).length
+    })),
+    [tipos, servicios]
+  );
 
   useEffect(() => {
     if (!seleccionado) return;
-    const actualizado = servicios.find((servicio) => servicio.id === seleccionado.id);
+    const actualizado = serviciosFiltrados.find((servicio) => servicio.id === seleccionado.id);
     setSeleccionado(actualizado || null);
-  }, [servicios, seleccionado?.id]);
+  }, [serviciosFiltrados, seleccionado?.id]);
 
   return (
     <>
       <EncabezadoPagina
         antetitulo="Gestión"
-        titulo="Servicios"
-        descripcion="Servicios disponibles y su precio actual."
-      />
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+        titulo={vista === 'servicios' ? 'Servicios' : 'Tipos de servicio'}
+        descripcion={vista === 'servicios'
+          ? 'Servicios disponibles y su precio actual.'
+          : 'Tipos utilizados para organizar los servicios disponibles.'}
+      >
+        <Boton variante="secundario" onClick={() => setVista(vista === 'servicios' ? 'tipos' : 'servicios')}>
+          {vista === 'servicios' ? 'Tipos de servicio' : 'Ver servicios'}
+        </Boton>
+      </EncabezadoPagina>
+
+      {vista === 'tipos' ? (
         <Panel>
+          {errorTipos && <Aviso tipo="error" className="m-3.5">{errorTipos}</Aviso>}
+          {cargandoTipos && !tipos.length
+            ? <Vacio>Cargando…</Vacio>
+            : (
+              <DataTable
+                columnas={columnasTipos}
+                datos={tiposConCantidad}
+                vacio="No hay tipos de servicio registrados."
+              />
+            )}
+        </Panel>
+      ) : (
+        <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
+          <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
             <select
               className="w-auto"
@@ -86,19 +130,20 @@ export default function ServiciosPage() {
             ? <Vacio>Cargando…</Vacio>
             : (
               <DataTable
-                columnas={columnas}
-                datos={servicios}
+                columnas={columnasServicios}
+                datos={serviciosFiltrados}
                 vacio="No hay servicios disponibles con este filtro."
                 seleccionadoId={seleccionado?.id}
                 onSeleccionar={setSeleccionado}
               />
             )}
-        </Panel>
+          </Panel>
 
-        <Panel lateral>
-          <DetalleServicio servicio={seleccionado} />
-        </Panel>
-      </div>
+          <Panel lateral>
+            <DetalleServicio servicio={seleccionado} />
+          </Panel>
+        </div>
+      )}
     </>
   );
 }
