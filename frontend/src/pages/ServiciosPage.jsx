@@ -63,6 +63,7 @@ export default function ServiciosPage({ user }) {
   const [tipoServicioId, setTipoServicioId] = useState('');
   const [seleccionado, setSeleccionado] = useState(null);
   const [creandoServicio, setCreandoServicio] = useState(false);
+  const [editandoServicio, setEditandoServicio] = useState(false);
   const [formServicio, setFormServicio] = useState(SERVICIO_VACIO);
   const [erroresServicio, setErroresServicio] = useState({});
   const [avisoServicio, setAvisoServicio] = useState(null);
@@ -109,6 +110,7 @@ export default function ServiciosPage({ user }) {
   function cambiarVista() {
     setVista(vista === 'servicios' ? 'tipos' : 'servicios');
     setCreandoServicio(false);
+    setEditandoServicio(false);
     setCreandoTipo(false);
     setErroresServicio({});
     setErroresTipo({});
@@ -121,18 +123,34 @@ export default function ServiciosPage({ user }) {
     setErroresServicio({});
     setAvisoServicio(null);
     setCreandoServicio(true);
+    setEditandoServicio(false);
   }
 
   function seleccionarServicio(servicio) {
     setSeleccionado(servicio);
     setCreandoServicio(false);
+    setEditandoServicio(false);
     setErroresServicio({});
     setAvisoServicio(null);
   }
 
   function cancelarServicio() {
     setCreandoServicio(false);
+    setEditandoServicio(false);
     setErroresServicio({});
+  }
+
+  function editarServicio() {
+    setFormServicio({
+      ...SERVICIO_VACIO,
+      tipoServicioId: String(seleccionado.tipoServicioId),
+      nombre: seleccionado.nombre,
+      descripcion: seleccionado.descripcion || ''
+    });
+    setErroresServicio({});
+    setAvisoServicio(null);
+    setCreandoServicio(false);
+    setEditandoServicio(true);
   }
 
   async function guardarServicio(event) {
@@ -140,12 +158,25 @@ export default function ServiciosPage({ user }) {
     setGuardandoServicio(true);
     setAvisoServicio(null);
     try {
-      const creado = await servicioService.crear(formServicio);
-      setSeleccionado(creado);
+      const guardado = editandoServicio
+        ? await servicioService.actualizar(seleccionado.id, {
+          tipoServicioId: formServicio.tipoServicioId,
+          nombre: formServicio.nombre,
+          descripcion: formServicio.descripcion,
+          activo: seleccionado.activo
+        })
+        : await servicioService.crear(formServicio);
+      setSeleccionado(guardado);
       setCreandoServicio(false);
+      setEditandoServicio(false);
       setFormServicio(SERVICIO_VACIO);
       setErroresServicio({});
-      setAvisoServicio({ tipo: 'success', texto: `Servicio «${creado.nombre}» registrado.` });
+      setAvisoServicio({
+        tipo: 'success',
+        texto: editandoServicio
+          ? `Servicio «${guardado.nombre}» actualizado.`
+          : `Servicio «${guardado.nombre}» registrado.`
+      });
       recargarServicios();
     } catch (error) {
       setErroresServicio(error.data?.errores || {});
@@ -269,7 +300,7 @@ export default function ServiciosPage({ user }) {
           {(errorTipos || errorServicios) && (
             <Aviso tipo="error" className="m-3.5">{errorTipos || errorServicios}</Aviso>
           )}
-          {avisoServicio && !creandoServicio && (
+          {avisoServicio && !creandoServicio && !editandoServicio && (
             <Aviso tipo={avisoServicio.tipo} className="m-3.5">{avisoServicio.texto}</Aviso>
           )}
           {cargando && !servicios.length
@@ -286,7 +317,7 @@ export default function ServiciosPage({ user }) {
           </Panel>
 
           <Panel lateral>
-            {creandoServicio ? (
+            {creandoServicio || editandoServicio ? (
               <FormularioServicio
                 tipos={tipos}
                 form={formServicio}
@@ -296,8 +327,15 @@ export default function ServiciosPage({ user }) {
                 guardando={guardandoServicio}
                 onGuardar={guardarServicio}
                 onCancelar={cancelarServicio}
+                editando={editandoServicio}
               />
-            ) : <DetalleServicio servicio={seleccionado} />}
+            ) : (
+              <DetalleServicio
+                servicio={seleccionado}
+                puedeEditar={puedeEditar}
+                onEditar={editarServicio}
+              />
+            )}
           </Panel>
         </div>
       )}
@@ -305,7 +343,7 @@ export default function ServiciosPage({ user }) {
   );
 }
 
-function FormularioServicio({ tipos, form, setForm, errores, aviso, guardando, onGuardar, onCancelar }) {
+function FormularioServicio({ tipos, form, setForm, errores, aviso, guardando, onGuardar, onCancelar, editando }) {
   const campo = (nombre) => ({
     name: nombre,
     value: form[nombre],
@@ -314,8 +352,8 @@ function FormularioServicio({ tipos, form, setForm, errores, aviso, guardando, o
 
   return (
     <>
-      <Antetitulo className="mb-2">Nuevo servicio</Antetitulo>
-      <h2 className="mb-4 text-xl font-bold">Registrar servicio</h2>
+      <Antetitulo className="mb-2">{editando ? 'Modificar servicio' : 'Nuevo servicio'}</Antetitulo>
+      <h2 className="mb-4 text-xl font-bold">{editando ? form.nombre : 'Registrar servicio'}</h2>
       {aviso && <Aviso tipo={aviso.tipo}>{aviso.texto}</Aviso>}
       {!tipos.length && (
         <Aviso tipo="warning">Registra primero un tipo de servicio.</Aviso>
@@ -333,33 +371,37 @@ function FormularioServicio({ tipos, form, setForm, errores, aviso, guardando, o
         <Campo etiqueta="Descripción" error={errores.descripcion}>
           <textarea maxLength={1000} {...campo('descripcion')} />
         </Campo>
-        <Campo etiqueta="Precio" error={errores.precio}>
-          <input
-            type="number"
-            min="1"
-            max="10000000"
-            step="1"
-            className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-            name="precio"
-            value={form.precio}
-            onKeyDown={(event) => {
-              if (['-', '+', 'e', 'E', '.', ','].includes(event.key)) event.preventDefault();
-            }}
-            onChange={(event) => {
-              if (/^\d*$/.test(event.target.value)) setForm({ ...form, precio: event.target.value });
-            }}
-          />
-        </Campo>
-        <Campo etiqueta="Cobro" error={errores.tipoPrecio}>
-          <select {...campo('tipoPrecio')}>
-            <option value="fijo">Precio fijo</option>
-            <option value="por_hora">Por hora</option>
-          </select>
-        </Campo>
+        {!editando && (
+          <>
+            <Campo etiqueta="Precio" error={errores.precio}>
+              <input
+                type="number"
+                min="1"
+                max="10000000"
+                step="1"
+                className="[appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+                name="precio"
+                value={form.precio}
+                onKeyDown={(event) => {
+                  if (['-', '+', 'e', 'E', '.', ','].includes(event.key)) event.preventDefault();
+                }}
+                onChange={(event) => {
+                  if (/^\d*$/.test(event.target.value)) setForm({ ...form, precio: event.target.value });
+                }}
+              />
+            </Campo>
+            <Campo etiqueta="Cobro" error={errores.tipoPrecio}>
+              <select {...campo('tipoPrecio')}>
+                <option value="fijo">Precio fijo</option>
+                <option value="por_hora">Por hora</option>
+              </select>
+            </Campo>
+          </>
+        )}
         <p className="text-xs text-stone-500">Todos los campos son obligatorios.</p>
         <div className="flex gap-2.5">
           <Boton type="submit" className="flex-1" disabled={guardando || !tipos.length}>
-            <span>{guardando ? 'Guardando…' : 'Registrar servicio'}</span><span aria-hidden="true">→</span>
+            <span>{guardando ? 'Guardando…' : editando ? 'Guardar cambios' : 'Registrar servicio'}</span><span aria-hidden="true">→</span>
           </Boton>
           <Boton variante="secundario" onClick={onCancelar}>Cancelar</Boton>
         </div>
@@ -368,7 +410,7 @@ function FormularioServicio({ tipos, form, setForm, errores, aviso, guardando, o
   );
 }
 
-function DetalleServicio({ servicio }) {
+function DetalleServicio({ servicio, puedeEditar, onEditar }) {
   if (!servicio) {
     return (
       <>
@@ -389,6 +431,7 @@ function DetalleServicio({ servicio }) {
         ['Cobro', labelTipoPrecio(version?.tipoPrecio)]
       ]} />
       {!version && <Aviso tipo="warning">Este servicio no tiene una versión de precio activa.</Aviso>}
+      {puedeEditar && <Boton onClick={onEditar}>Editar servicio</Boton>}
     </>
   );
 }
