@@ -9,13 +9,13 @@ const CAMPOS_PARA_COTIZAR = [
   { campo: 'horaFin', etiqueta: 'Hora de término' },
   { campo: 'cantidadPersonas', etiqueta: 'Cantidad de personas' },
   { campo: 'lugar', etiqueta: 'Lugar' },
-  { campo: 'serviciosSeleccionados', etiqueta: 'Servicios necesarios' }
+  { campo: 'servicios', etiqueta: 'Servicios necesarios' }
 ];
 
 const ESTADOS = ['pendiente', 'disponible_cotizar', 'confirmado'];
 const INCLUIR_SOLICITUD = {
   cliente: { select: { id: true, nombre: true } },
-  serviciosSeleccionados: {
+  servicios: {
     include: {
       servicio: { include: INCLUIR_SERVICIO },
       versionServicio: true
@@ -33,9 +33,8 @@ const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
 export function camposFaltantes(solicitud) {
   return CAMPOS_PARA_COTIZAR
     .filter(({ campo }) => {
-      if (campo === 'serviciosSeleccionados') {
-        const seleccionados = solicitud.serviciosSeleccionados?.length || 0;
-        return seleccionados === 0 && !solicitud.servicios;
+      if (campo === 'servicios') {
+        return (solicitud.servicios?.length || 0) === 0;
       }
       return solicitud[campo] === null || solicitud[campo] === undefined || solicitud[campo] === '';
     })
@@ -48,14 +47,14 @@ function calcularEstado(datos) {
 }
 
 export function aRespuesta(solicitud) {
-  const serviciosSeleccionados = (solicitud.serviciosSeleccionados || [])
-    .map(({ servicio, versionServicio }) => ({
-      ...aRespuestaServicio(servicio),
-      versionServicio
-    }));
+  const servicios = (solicitud.servicios || [])
+    .map(({ servicio, versionServicio }) => {
+      const { versionActiva, ...datosServicio } = aRespuestaServicio(servicio);
+      return { ...datosServicio, versionServicio };
+    });
   const respuesta = {
     ...solicitud,
-    serviciosSeleccionados,
+    servicios,
     fecha: textoFecha(solicitud.fecha),
     horaInicio: textoHora(solicitud.horaInicio),
     horaFin: textoHora(solicitud.horaFin)
@@ -64,7 +63,7 @@ export function aRespuesta(solicitud) {
   return respuesta;
 }
 
-function aDatos(datos, serviciosSeleccionados = []) {
+function aDatos(datos, servicios = []) {
   return {
     clienteId: datos.clienteId,
     fecha: aFecha(datos.fecha),
@@ -72,8 +71,7 @@ function aDatos(datos, serviciosSeleccionados = []) {
     horaFin: aHora(datos.horaFin),
     cantidadPersonas: datos.cantidadPersonas,
     lugar: datos.lugar,
-    servicios: datos.servicios,
-    estado: calcularEstado({ ...datos, serviciosSeleccionados })
+    estado: calcularEstado({ ...datos, servicios })
   };
 }
 
@@ -130,7 +128,7 @@ export async function actualizar(id, datos) {
   }
   if (datos.clienteId !== actual.clienteId) await asegurarClienteRegistrado(datos.clienteId);
 
-  const data = aDatos(datos, actual.serviciosSeleccionados);
+  const data = aDatos(datos, actual.servicios);
   // Si cambia la fecha o el horario, la disponibilidad debe revisarse de nuevo.
   if (datos.fecha !== actual.fecha || datos.horaInicio !== actual.horaInicio || datos.horaFin !== actual.horaFin) {
     data.fechaHabilitada = false;
@@ -167,7 +165,7 @@ export async function agregarServicio(solicitudId, { servicioId }) {
     throw Object.assign(new Error('El servicio seleccionado no tiene una versión de precio activa.'), { status: 409 });
   }
 
-  const existente = solicitud.serviciosSeleccionados.some((seleccionado) => seleccionado.id === servicioId);
+  const existente = solicitud.servicios.some((seleccionado) => seleccionado.id === servicioId);
   if (existente) {
     throw Object.assign(new Error('El servicio ya está agregado a la solicitud.'), { status: 409 });
   }
@@ -192,6 +190,49 @@ export async function agregarServicio(solicitudId, { servicioId }) {
     }
 
     return solicitudConServicio;
+  });
+
+  return aRespuesta(actualizada);
+}
+
+export async function quitarServicio(solicitudId, servicioId) {
+  const solicitud = await obtenerPorId(solicitudId);
+  if (solicitud.estado === 'confirmado') {
+    throw Object.assign(new Error('El evento ya está confirmado; no se pueden quitar servicios de la solicitud.'), {
+      status: 409
+    });
+  }
+
+  const servicioIdNumerico = Number(servicioId);
+  if (!Number.isInteger(servicioIdNumerico) || servicioIdNumerico <= 0) {
+    throw Object.assign(new Error('Identificador de servicio inválido.'), { status: 400 });
+  }
+
+  const existente = await prisma.solicitudServicio.findUnique({
+    where: { solicitudId_servicioId: { solicitudId, servicioId: servicioIdNumerico } }
+  });
+  if (!existente) {
+    throw Object.assign(new Error('El servicio no está agregado a la solicitud.'), { status: 404 });
+  }
+
+  const actualizada = await prisma.$transaction(async (transaction) => {
+    await transaction.solicitudServicio.delete({ where: { id: existente.id } });
+
+    const solicitudConServicios = await transaction.solicitud.findUnique({
+      where: { id: solicitudId },
+      include: INCLUIR_SOLICITUD
+    });
+    const estado = calcularEstado(solicitudConServicios);
+
+    if (estado !== solicitudConServicios.estado) {
+      return transaction.solicitud.update({
+        where: { id: solicitudId },
+        data: { estado },
+        include: INCLUIR_SOLICITUD
+      });
+    }
+
+    return solicitudConServicios;
   });
 
   return aRespuesta(actualizada);

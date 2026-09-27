@@ -54,8 +54,7 @@ export function validarSolicitud(req, res, next) {
     horaInicio: horaInicio && horaInicio.slice(0, 5),
     horaFin: horaFin && horaFin.slice(0, 5),
     cantidadPersonas,
-    lugar,
-    servicios: textoOpcional(req.body.servicios)
+    lugar
   };
   next();
 }

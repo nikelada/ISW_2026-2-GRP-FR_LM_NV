@@ -41,3 +41,11 @@ export async function agregarServicio(req, res, next) {
     next(error);
   }
 }
+
+export async function quitarServicio(req, res, next) {
+  try {
+    res.json(await solicitudService.quitarServicio(req.params.id, req.params.servicioId));
+  } catch (error) {
+    next(error);
+  }
+}

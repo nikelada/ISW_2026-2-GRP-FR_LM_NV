@@ -17,6 +17,12 @@ router.post(
   validarServicioSeleccionado,
   solicitudController.agregarServicio
 );
+router.delete(
+  '/:id/servicios/:servicioId',
+  autorizarRol(ROLES_PRODUCCION),
+  validarId,
+  solicitudController.quitarServicio
+);
 router.put('/:id', autorizarRol(ROLES_PRODUCCION), validarId, validarSolicitud, solicitudController.actualizar);
 
 export default router;
