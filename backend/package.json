@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "prisma migrate deploy && prisma generate && nodemon src/index.js",
-    "start": "prisma migrate deploy && prisma generate && node src/index.js",
+    "dev": "npm run diagnostico && prisma migrate deploy && prisma generate && nodemon src/index.js",
+    "start": "npm run diagnostico && prisma migrate deploy && prisma generate && node src/index.js",
     "migrate": "prisma migrate dev",
     "seed": "node prisma/seed.js",
     "diagnostico": "node prisma/diagnostico-solicitudes.js",
