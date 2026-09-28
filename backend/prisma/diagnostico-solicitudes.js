@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { Prisma, PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
 const ESTADOS_REVISADOS = ['confirmado', 'disponible_cotizar'];
@@ -57,7 +57,7 @@ async function obtenerConflictos({ tieneSolicitudes, tieneServiciosTexto, tieneR
     return prisma.$queryRaw`
       SELECT s.id, s."clienteId", s.estado::text AS estado
       FROM "solicitudes" AS s
-      WHERE s.estado::text IN ('confirmado', 'disponible_cotizar')
+      WHERE s.estado::text IN (${Prisma.join(ESTADOS_REVISADOS)})
         AND NOT EXISTS (
           SELECT 1
           FROM "solicitudes_servicios" AS ss
@@ -71,7 +71,7 @@ async function obtenerConflictos({ tieneSolicitudes, tieneServiciosTexto, tieneR
     return prisma.$queryRaw`
       SELECT id, "clienteId", estado::text AS estado, "servicios" AS detalle
       FROM "solicitudes"
-      WHERE estado::text IN ('confirmado', 'disponible_cotizar')
+      WHERE estado::text IN (${Prisma.join(ESTADOS_REVISADOS)})
         AND ("servicios" IS NULL OR btrim("servicios") = '')
       ORDER BY estado::text, id
     `;
@@ -80,7 +80,7 @@ async function obtenerConflictos({ tieneSolicitudes, tieneServiciosTexto, tieneR
   return prisma.$queryRaw`
     SELECT id, "clienteId", estado::text AS estado
     FROM "solicitudes"
-    WHERE estado::text IN ('confirmado', 'disponible_cotizar')
+    WHERE estado::text IN (${Prisma.join(ESTADOS_REVISADOS)})
     ORDER BY estado::text, id
   `;
 }
