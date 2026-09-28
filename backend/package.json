@@ -8,6 +8,7 @@
     "start": "prisma migrate deploy && prisma generate && node src/index.js",
     "migrate": "prisma migrate dev",
     "seed": "node prisma/seed.js",
+    "diagnostico": "node prisma/diagnostico-solicitudes.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {
