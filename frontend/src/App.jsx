@@ -4,6 +4,7 @@ import AuthPage from './pages/AuthPage.jsx';
 import CalendarioPage from './pages/CalendarioPage.jsx';
 import ClientesPage from './pages/ClientesPage.jsx';
 import SolicitudesPage from './pages/SolicitudesPage.jsx';
+import InventarioPage from './pages/InventarioPage.jsx';
 import { getCurrentUser } from './services/authService.js';
 import { clearSession, getStoredSession } from './utils/session.js';
 
@@ -11,7 +12,8 @@ import { clearSession, getStoredSession } from './utils/session.js';
 const SECCIONES = [
   { clave: 'clientes', titulo: 'Clientes', Pagina: ClientesPage },
   { clave: 'solicitudes', titulo: 'Solicitudes', Pagina: SolicitudesPage },
-  { clave: 'calendario', titulo: 'Calendario', Pagina: CalendarioPage }
+  { clave: 'calendario', titulo: 'Calendario', Pagina: CalendarioPage },
+  { clave: 'inventario', titulo: 'Inventario', Pagina: InventarioPage }
 ];
 
 function leerHash() {
