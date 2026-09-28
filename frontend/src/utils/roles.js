@@ -7,6 +7,10 @@ export function esProduccion(user) {
   return ROLES_PRODUCCION.includes(user?.role);
 }
 
+export function esOperaciones(user) {
+  return ROLES_PRODUCCION.includes(user?.role);
+}
+
 export function areaDelRol(role) {
   return AREA_POR_ROL[role] || role;
 }
