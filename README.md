@@ -74,6 +74,12 @@ npm run seed
 
 Solo inserta datos si todavía no hay clientes registrados. Las fechas se calculan a partir del día en que se ejecuta.
 
+```bash
+npm run seed -- --merge
+```
+
+Permite insertar datos no duplicados si existen clientes.
+
 ## Estructura del proyecto
 
 - `backend/prisma/` contiene el modelo de datos (`schema.prisma`) y las migraciones.
