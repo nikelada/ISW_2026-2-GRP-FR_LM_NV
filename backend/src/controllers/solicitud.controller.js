@@ -33,3 +33,19 @@ export async function actualizar(req, res, next) {
     next(error);
   }
 }
+
+export async function agregarServicio(req, res, next) {
+  try {
+    res.status(201).json(await solicitudService.agregarServicio(req.params.id, req.body));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function quitarServicio(req, res, next) {
+  try {
+    res.json(await solicitudService.quitarServicio(req.params.id, req.params.servicioId));
+  } catch (error) {
+    next(error);
+  }
+}

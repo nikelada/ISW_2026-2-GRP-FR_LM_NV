@@ -54,8 +54,25 @@ export function validarSolicitud(req, res, next) {
     horaInicio: horaInicio && horaInicio.slice(0, 5),
     horaFin: horaFin && horaFin.slice(0, 5),
     cantidadPersonas,
-    lugar,
-    servicios: textoOpcional(req.body.servicios)
+    lugar
   };
+  next();
+}
+
+// La interfaz puede filtrar por tipo, pero la solicitud solo necesita el servicio.
+// El backend obtiene y valida su tipo a partir de la relación registrada.
+export function validarServicioSeleccionado(req, res, next) {
+  const servicioId = Number(req.body.servicioId);
+  const errores = {};
+
+  if (!Number.isInteger(servicioId) || servicioId <= 0) {
+    errores.servicioId = 'Selecciona un servicio válido.';
+  }
+
+  if (Object.keys(errores).length) {
+    return res.status(400).json({ message: 'Revisa el servicio seleccionado.', errores });
+  }
+
+  req.body = { servicioId };
   next();
 }
