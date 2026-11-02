@@ -1,6 +1,6 @@
 import { prisma } from '../config/prisma.js';
 
-// Gestionar clientes.
+// Listado con búsqueda por nombre, correo o teléfono
 export function listar(busqueda = '') {
   const where = busqueda
     ? {
@@ -18,12 +18,30 @@ export async function obtenerPorId(id) {
   return cliente;
 }
 
-// Una vez registrado, el cliente queda disponible para asociarlo a nuevas solicitudes.
-export function crear(datos) {
+// Si el correo ya existe, el cliente ya está registrado y no se duplica
+async function asegurarNoRegistrado(correo, excluirId) {
+  const existente = await prisma.cliente.findFirst({
+    where: { correo: { equals: correo, mode: 'insensitive' }, id: excluirId ? { not: excluirId } : undefined }
+  });
+  if (existente) {
+    const mensaje = excluirId
+      ? `El correo pertenece a otro cliente registrado («${existente.nombre}»).`
+      : `El cliente ya se encuentra registrado como «${existente.nombre}». Actualiza sus datos en lugar de registrarlo otra vez.`;
+    throw Object.assign(new Error(mensaje), {
+      status: 409,
+      detalles: { errores: { correo: 'Este correo pertenece a un cliente registrado.' }, clienteExistente: existente }
+    });
+  }
+}
+
+// Después de registrarlo ya se puede usar en solicitudes nuevas
+export async function crear(datos) {
+  await asegurarNoRegistrado(datos.correo);
   return prisma.cliente.create({ data: datos });
 }
 
 export async function actualizar(id, datos) {
   await obtenerPorId(id);
+  await asegurarNoRegistrado(datos.correo, id);
   return prisma.cliente.update({ where: { id }, data: datos });
 }

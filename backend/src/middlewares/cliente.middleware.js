@@ -1,7 +1,6 @@
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-// El registro debe contener los datos obligatorios definidos por la empresa
-// (nombre, teléfono y correo). Deja el cuerpo normalizado para el controlador.
+// Nombre, teléfono y correo son obligatorios. Deja el body limpio para el controlador
 export function validarCliente(req, res, next) {
   const nombre = String(req.body.nombre || '').trim();
   const telefono = String(req.body.telefono || '').trim();

@@ -14,7 +14,7 @@ import { esProduccion } from '../utils/roles.js';
 
 const VACIO = { nombre: '', telefono: '', correo: '' };
 
-// Gestionar clientes: registrar y actualizar los datos de un cliente.
+// Registro y edición de clientes
 export default function ClientesPage({ user, onNavegar }) {
   const puedeEditar = esProduccion(user);
   const [busqueda, setBusqueda] = useState('');
@@ -25,6 +25,7 @@ export default function ClientesPage({ user, onNavegar }) {
   const [form, setForm] = useState(VACIO);
   const [errores, setErrores] = useState({});
   const [aviso, setAviso] = useState(null);
+  const [existente, setExistente] = useState(null);
   const [guardando, setGuardando] = useState(false);
 
   useEffect(() => {
@@ -37,6 +38,7 @@ export default function ClientesPage({ user, onNavegar }) {
     setForm({ nombre: cliente.nombre, telefono: cliente.telefono, correo: cliente.correo });
     setErrores({});
     setAviso(null);
+    setExistente(null);
   }
 
   function cancelar() {
@@ -49,6 +51,7 @@ export default function ClientesPage({ user, onNavegar }) {
     event.preventDefault();
     setGuardando(true);
     setAviso(null);
+    setExistente(null);
     try {
       const guardado = editando
         ? await clienteService.actualizar(editando.id, form)
@@ -59,6 +62,7 @@ export default function ClientesPage({ user, onNavegar }) {
     } catch (e) {
       setErrores(e.data?.errores || {});
       setAviso({ tipo: 'error', texto: e.message });
+      setExistente(editando ? null : e.data?.clienteExistente || null);
     } finally {
       setGuardando(false);
     }
@@ -107,7 +111,12 @@ export default function ClientesPage({ user, onNavegar }) {
           <Panel lateral>
             <Antetitulo className="mb-2">{editando ? 'Actualizar datos' : 'Nuevo cliente'}</Antetitulo>
             <h2 className="mb-4 text-xl font-bold">{editando ? editando.nombre : 'Registrar cliente'}</h2>
-            {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
+            {aviso && (
+              <Aviso tipo={aviso.tipo}>
+                <p>{aviso.texto}</p>
+                {existente && <p><Boton variante="enlace" onClick={() => editar(existente)}>Actualizar datos de {existente.nombre}</Boton></p>}
+              </Aviso>
+            )}
             <form className="grid gap-4" onSubmit={guardar} noValidate>
               <Campo etiqueta="Nombre" error={errores.nombre}><input type="text" maxLength={150} {...campo('nombre')} /></Campo>
               <Campo etiqueta="Teléfono" error={errores.telefono}><input type="tel" maxLength={30} {...campo('telefono')} /></Campo>
