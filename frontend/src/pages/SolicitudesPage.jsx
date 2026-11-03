@@ -52,7 +52,7 @@ function aFormulario(solicitud) {
   return Object.fromEntries(Object.keys(VACIO).map((campo) => [campo, solicitud[campo] ?? '']));
 }
 
-// Registrar solicitudes asociadas a un cliente registrado.
+// Solicitudes de eventos (siempre van asociadas a un cliente)
 export default function SolicitudesPage({ user, params }) {
   const puedeEditar = esProduccion(user);
   const [filtro, setFiltro] = useState('');
@@ -72,8 +72,8 @@ export default function SolicitudesPage({ user, params }) {
   const [resultado, setResultado] = useState(null);
   const idInicial = Number(params.get('id')) || null;
 
-  // Mantiene el detalle sincronizado con la última carga de la lista
-  // y abre la solicitud indicada en la URL (p. ej. desde el calendario).
+  // Actualiza el detalle cuando se recarga la lista y abre la solicitud que venga en la URL
+  // (por ejemplo cuando se llega desde el calendario)
   useEffect(() => {
     const id = seleccionada?.id ?? idInicial;
     if (!id) return;
@@ -140,7 +140,7 @@ export default function SolicitudesPage({ user, params }) {
     }
   }
 
-  // Revisa la fecha y horario de la solicitud contra los eventos confirmados.
+  // Revisa si la fecha y hora chocan con algún evento confirmado
   async function revisarFecha() {
     setAviso(null);
     try {
@@ -191,7 +191,7 @@ export default function SolicitudesPage({ user, params }) {
 
   return (
     <>
-      <EncabezadoPagina antetitulo="Gestión" titulo="Solicitudes de eventos" descripcion="Solicitudes registradas y su estado para continuar a cotización.">
+      <EncabezadoPagina antetitulo="Gestión" titulo="Solicitudes de eventos" descripcion="Solicitudes de eventos asociadas a clientes registrados y su estado.">
         {puedeEditar && <Boton onClick={nueva}><span>Nueva solicitud</span><span aria-hidden="true">+</span></Boton>}
       </EncabezadoPagina>
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -200,7 +200,7 @@ export default function SolicitudesPage({ user, params }) {
             <select className="w-auto" aria-label="Filtrar por estado" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
               <option value="">Todos los estados</option>
               <option value="pendiente">Pendientes de información</option>
-              <option value="disponible_cotizar">Disponibles para cotizar</option>
+              <option value="registrada">Registradas</option>
               <option value="confirmado">Fecha confirmada</option>
             </select>
           </div>
@@ -318,12 +318,12 @@ function DetalleSolicitud({
           <p>Sus datos ya no se editan desde la solicitud.</p>
         </Aviso>
       ) : s.faltantes.length ? (
-        <Aviso tipo="warning" titulo="Falta información para pasar a cotización">
+        <Aviso tipo="warning" titulo="Solicitud pendiente: falta información obligatoria">
           <ul>{s.faltantes.map((f) => <li key={f}>{f}</li>)}</ul>
         </Aviso>
       ) : (
-        <Aviso tipo="success" titulo="Información completa">
-          <p>La solicitud está disponible para continuar al proceso de cotización.</p>
+        <Aviso tipo="success" titulo="Solicitud registrada">
+          <p>Tiene toda la información obligatoria y puede continuar con las siguientes etapas del proceso.</p>
         </Aviso>
       )}
       <ListaDatos datos={[

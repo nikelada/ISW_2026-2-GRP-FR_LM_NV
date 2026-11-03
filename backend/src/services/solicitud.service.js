@@ -2,8 +2,8 @@ import { prisma } from '../config/prisma.js';
 import * as clienteService from './cliente.service.js';
 import { aRespuesta as aRespuestaServicio, INCLUIR_SERVICIO } from './servicio.service.js';
 
-// Información obligatoria para que la solicitud pueda pasar a cotización.
-const CAMPOS_PARA_COTIZAR = [
+// Información obligatoria para que la solicitud quede registrada.
+const CAMPOS_OBLIGATORIOS = [
   { campo: 'fecha', etiqueta: 'Fecha' },
   { campo: 'horaInicio', etiqueta: 'Hora de inicio' },
   { campo: 'horaFin', etiqueta: 'Hora de término' },
@@ -12,7 +12,7 @@ const CAMPOS_PARA_COTIZAR = [
   { campo: 'servicios', etiqueta: 'Servicios necesarios' }
 ];
 
-const ESTADOS = ['pendiente', 'disponible_cotizar', 'confirmado'];
+const ESTADOS = ['pendiente', 'registrada', 'confirmado'];
 const INCLUIR_SOLICITUD = {
   cliente: { select: { id: true, nombre: true } },
   servicios: {
@@ -24,14 +24,14 @@ const INCLUIR_SOLICITUD = {
   }
 };
 
-// Prisma representa DATE y TIME de PostgreSQL como Date en UTC.
+// Prisma devuelve DATE y TIME como Date en UTC, por eso estas conversiones
 export const aFecha = (texto) => (texto ? new Date(`${texto}T00:00:00Z`) : null);
 export const aHora = (texto) => (texto ? new Date(`1970-01-01T${texto}:00Z`) : null);
 const textoFecha = (valor) => (valor ? valor.toISOString().slice(0, 10) : null);
 const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
 
 export function camposFaltantes(solicitud) {
-  return CAMPOS_PARA_COTIZAR
+  return CAMPOS_OBLIGATORIOS
     .filter(({ campo }) => {
       if (campo === 'servicios') {
         return (solicitud.servicios?.length || 0) === 0;
@@ -41,9 +41,9 @@ export function camposFaltantes(solicitud) {
     .map(({ etiqueta }) => etiqueta);
 }
 
-// Si falta algún dato queda pendiente; cuando se completa, queda disponible para cotizar.
+// Si falta algo queda pendiente, si está todo queda registrada
 function calcularEstado(datos) {
-  return camposFaltantes(datos).length ? 'pendiente' : 'disponible_cotizar';
+  return camposFaltantes(datos).length ? 'pendiente' : 'registrada';
 }
 
 export function aRespuesta(solicitud) {
@@ -75,7 +75,7 @@ function aDatos(datos, servicios = []) {
   };
 }
 
-// La solicitud debe estar asociada a un cliente registrado.
+// El cliente de la solicitud tiene que estar registrado
 async function asegurarClienteRegistrado(clienteId) {
   try {
     await clienteService.obtenerPorId(clienteId);
@@ -100,12 +100,9 @@ export async function listar({ estado, clienteId } = {}) {
   return solicitudes.map(aRespuesta);
 }
 
-/**
- * Punto de integración con el módulo de cotizaciones: solicitudes con toda
- * la información obligatoria, disponibles para cotizar.
- */
-export function listarParaCotizar() {
-  return listar({ estado: 'disponible_cotizar' });
+// Para las etapas siguientes (ej. cotizaciones). Registrar la solicitud no crea la cotización.
+export function listarRegistradas() {
+  return listar({ estado: 'registrada' });
 }
 
 export async function obtenerPorId(id) {
@@ -120,7 +117,7 @@ export async function crear(datos) {
   return aRespuesta(creada);
 }
 
-// Permite completar o corregir los datos mientras el evento no esté confirmado; el estado se recalcula.
+// Se puede completar o corregir mientras no esté confirmado (el estado se vuelve a calcular)
 export async function actualizar(id, datos) {
   const actual = await obtenerPorId(id);
   if (actual.estado === 'confirmado') {
@@ -129,7 +126,7 @@ export async function actualizar(id, datos) {
   if (datos.clienteId !== actual.clienteId) await asegurarClienteRegistrado(datos.clienteId);
 
   const data = aDatos(datos, actual.servicios);
-  // Si cambia la fecha o el horario, la disponibilidad debe revisarse de nuevo.
+  // Si cambió la fecha u hora hay que volver a revisar la disponibilidad
   if (datos.fecha !== actual.fecha || datos.horaInicio !== actual.horaInicio || datos.horaFin !== actual.horaFin) {
     data.fechaHabilitada = false;
   }

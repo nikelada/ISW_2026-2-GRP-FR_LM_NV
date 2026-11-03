@@ -19,7 +19,7 @@ model User {
   @@map("users")
 }
 
-// Datos obligatorios del cliente definidos por la empresa.
+// Nombre, teléfono y correo son obligatorios
 model Cliente {
   id          Int         @id @default(autoincrement())
   nombre      String      @db.VarChar(150)
@@ -34,8 +34,9 @@ model Cliente {
 
 enum EstadoSolicitud {
   pendiente
-  disponible_cotizar
-  // Lo asigna el proceso que confirma el evento; se usa para detectar conflictos de horario.
+  // ya tiene todos los datos obligatorios
+  registrada
+  // lo pone quien confirma el evento; con esto se ven los choques de horario
   confirmado
 }
 
@@ -55,7 +56,7 @@ enum EstadoVersionServicio {
   inactivo
 }
 
-// Solicitud de evento. Los datos pueden faltar: en ese caso queda pendiente.
+// Solicitud de evento. Si le falta algún dato queda pendiente
 model Solicitud {
   id                     Int                 @id @default(autoincrement())
   clienteId              Int
@@ -67,7 +68,7 @@ model Solicitud {
   lugar                  String?             @db.VarChar(255)
   servicios              SolicitudServicio[]
   estado                 EstadoSolicitud     @default(pendiente)
-  // La fecha y horario fueron revisados sin conflicto y pueden continuar a confirmación.
+  // true si la fecha y hora se revisaron y no chocan con nada
   fechaHabilitada        Boolean             @default(false)
   createdAt              DateTime            @default(now()) @db.Timestamp(6)
   updatedAt              DateTime            @updatedAt @db.Timestamp(6)

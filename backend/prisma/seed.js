@@ -247,7 +247,7 @@ async function main() {
       horaFin: hora('22:00'),
       cantidadPersonas: 80,
       lugar: 'Casona Las Acacias',
-      estado: 'disponible_cotizar',
+      estado: 'registrada',
       fechaHabilitada: false,
       servicios: [servicios.get('catering')]
     },
