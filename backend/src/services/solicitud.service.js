@@ -29,8 +29,8 @@ const INCLUIR_SOLICITUD = {
 // Prisma devuelve DATE y TIME como Date en UTC, por eso estas conversiones
 export const aFecha = (texto) => (texto ? new Date(`${texto}T00:00:00Z`) : null);
 export const aHora = (texto) => (texto ? new Date(`1970-01-01T${texto}:00Z`) : null);
-const textoFecha = (valor) => (valor ? valor.toISOString().slice(0, 10) : null);
-const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
+export const textoFecha = (valor) => (valor ? valor.toISOString().slice(0, 10) : null);
+export const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
 
 export function camposFaltantes(solicitud) {
   return CAMPOS_OBLIGATORIOS

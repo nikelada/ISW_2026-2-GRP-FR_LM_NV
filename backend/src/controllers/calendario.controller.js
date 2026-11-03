@@ -16,6 +16,14 @@ export async function disponibilidad(req, res, next) {
   }
 }
 
+export async function alternativas(req, res, next) {
+  try {
+    res.json(await calendarioService.buscarAlternativas(req.consulta));
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function validarFecha(req, res, next) {
   try {
     res.json(await calendarioService.validarFechaSolicitud(req.params.id));
