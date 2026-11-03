@@ -61,11 +61,14 @@ model Solicitud {
   id                     Int                 @id @default(autoincrement())
   clienteId              Int
   cliente                Cliente             @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  tipoEvento             String?             @db.VarChar(100)
   fecha                  DateTime?           @db.Date
   horaInicio             DateTime?           @db.Time(0)
   horaFin                DateTime?           @db.Time(0)
   cantidadPersonas       Int?
   lugar                  String?             @db.VarChar(255)
+  requerimientosTecnicos String?             @db.Text
+  // servicios adicionales (del catálogo)
   servicios              SolicitudServicio[]
   estado                 EstadoSolicitud     @default(pendiente)
   // true si la fecha y hora se revisaron y no chocan con nada

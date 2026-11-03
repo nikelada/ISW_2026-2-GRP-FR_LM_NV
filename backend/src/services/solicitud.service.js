@@ -4,12 +4,14 @@ import { aRespuesta as aRespuestaServicio, INCLUIR_SERVICIO } from './servicio.s
 
 // Información obligatoria para que la solicitud quede registrada.
 const CAMPOS_OBLIGATORIOS = [
+  { campo: 'tipoEvento', etiqueta: 'Tipo de evento' },
   { campo: 'fecha', etiqueta: 'Fecha' },
   { campo: 'horaInicio', etiqueta: 'Hora de inicio' },
   { campo: 'horaFin', etiqueta: 'Hora de término' },
   { campo: 'cantidadPersonas', etiqueta: 'Cantidad de personas' },
   { campo: 'lugar', etiqueta: 'Lugar' },
-  { campo: 'servicios', etiqueta: 'Servicios necesarios' }
+  { campo: 'requerimientosTecnicos', etiqueta: 'Requerimientos técnicos' },
+  { campo: 'servicios', etiqueta: 'Servicios adicionales' }
 ];
 
 const ESTADOS = ['pendiente', 'registrada', 'confirmado'];
@@ -66,11 +68,13 @@ export function aRespuesta(solicitud) {
 function aDatos(datos, servicios = []) {
   return {
     clienteId: datos.clienteId,
+    tipoEvento: datos.tipoEvento,
     fecha: aFecha(datos.fecha),
     horaInicio: aHora(datos.horaInicio),
     horaFin: aHora(datos.horaFin),
     cantidadPersonas: datos.cantidadPersonas,
     lugar: datos.lugar,
+    requerimientosTecnicos: datos.requerimientosTecnicos,
     estado: calcularEstado({ ...datos, servicios })
   };
 }

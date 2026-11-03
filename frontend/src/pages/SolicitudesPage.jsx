@@ -18,7 +18,7 @@ import * as servicioService from '../services/servicioService.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
-const VACIO = { clienteId: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '' };
+const VACIO = { clienteId: '', tipoEvento: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '', requerimientosTecnicos: '' };
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
   style: 'currency',
@@ -40,7 +40,16 @@ const sinDato = (texto = '—') => <span className="text-xs text-amber-700">{tex
 
 const columnas = [
   { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (s) => `#${s.id}` },
-  { campo: 'cliente', titulo: 'Cliente', render: (s) => <strong>{s.cliente.nombre}</strong> },
+  {
+    campo: 'cliente',
+    titulo: 'Cliente',
+    render: (s) => (
+      <>
+        <strong>{s.cliente.nombre}</strong>
+        <small className="block text-stone-500">{s.tipoEvento || sinDato('Sin tipo de evento')}</small>
+      </>
+    )
+  },
   { campo: 'fecha', titulo: 'Fecha', className: 'whitespace-nowrap', render: (s) => (s.fecha ? formatearFecha(s.fecha) : sinDato('Sin fecha')) },
   { campo: 'horario', titulo: 'Horario', className: 'whitespace-nowrap', render: (s) => formatearHorario(s) || sinDato('Sin horario') },
   { campo: 'cantidadPersonas', titulo: 'Personas', render: (s) => s.cantidadPersonas ?? sinDato() },
@@ -245,6 +254,7 @@ export default function SolicitudesPage({ user, params }) {
                     {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
                   </select>
                 </Campo>
+                <Campo etiqueta="Tipo de evento" error={errores.tipoEvento}><input type="text" maxLength={100} placeholder="Ej.: matrimonio, seminario" {...campo('tipoEvento')} /></Campo>
                 <Campo etiqueta="Fecha" error={errores.fecha}><input type="date" {...campo('fecha')} /></Campo>
                 <div className="grid grid-cols-2 gap-3">
                   <Campo etiqueta="Hora de inicio" error={errores.horaInicio}><input type="time" {...campo('horaInicio')} /></Campo>
@@ -252,7 +262,8 @@ export default function SolicitudesPage({ user, params }) {
                 </div>
                 <Campo etiqueta="Cantidad de personas" error={errores.cantidadPersonas}><input type="number" min="1" step="1" {...campo('cantidadPersonas')} /></Campo>
                 <Campo etiqueta="Lugar" error={errores.lugar}><input type="text" maxLength={255} {...campo('lugar')} /></Campo>
-                <p className="text-xs text-stone-500">El cliente es obligatorio. Los servicios se asociarán después de registrar la solicitud. Si falta algún otro dato, la solicitud quedará pendiente hasta completarla.</p>
+                <Campo etiqueta="Requerimientos técnicos" error={errores.requerimientosTecnicos}><textarea rows={3} maxLength={2000} {...campo('requerimientosTecnicos')} /></Campo>
+                <p className="text-xs text-stone-500">El cliente es obligatorio. Los servicios adicionales se asocian después de guardar la solicitud. Si falta algún otro dato, la solicitud quedará pendiente hasta completarla.</p>
                 <div className="flex gap-2.5">
                   <Boton type="submit" className="flex-1" disabled={guardando}>
                     <span>{modo === 'editar' ? 'Guardar cambios' : 'Registrar solicitud'}</span><span aria-hidden="true">→</span>
@@ -327,13 +338,15 @@ function DetalleSolicitud({
         </Aviso>
       )}
       <ListaDatos datos={[
+        ['Tipo de evento', s.tipoEvento || '—'],
         ['Fecha', s.fecha ? formatearFecha(s.fecha) : '—'],
         ['Horario', formatearHorario(s) || '—'],
         ['Cantidad de personas', s.cantidadPersonas ?? '—'],
-        ['Lugar', s.lugar || '—']
+        ['Lugar', s.lugar || '—'],
+        ['Requerimientos técnicos', s.requerimientosTecnicos || '—']
       ]} />
       <div className="mb-4 border-t border-stone-200 pt-4">
-        <Antetitulo className="mb-2">Servicios necesarios</Antetitulo>
+        <Antetitulo className="mb-2">Servicios adicionales</Antetitulo>
         {servicios.length ? (
           <ul className="mb-3 grid gap-2 text-sm">
             {servicios.map((servicio) => (

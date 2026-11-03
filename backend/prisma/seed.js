@@ -223,8 +223,10 @@ async function main() {
       fecha: enDias(7),
       horaInicio: hora('19:00'),
       horaFin: hora('23:30'),
+      tipoEvento: 'Matrimonio',
       cantidadPersonas: 120,
       lugar: 'Centro de Eventos Los Robles',
+      requerimientosTecnicos: 'Escenario de 6 x 4 m, dos micrófonos inalámbricos y conexión trifásica.',
       estado: 'confirmado',
       fechaHabilitada: true,
       servicios: [servicios.get('catering'), servicios.get('sonido')]
@@ -234,8 +236,10 @@ async function main() {
       fecha: enDias(10),
       horaInicio: hora('10:00'),
       horaFin: hora('14:00'),
+      tipoEvento: 'Seminario corporativo',
       cantidadPersonas: 40,
       lugar: 'Hotel Costanera, salón B',
+      requerimientosTecnicos: 'Proyector, telón y conexión a internet para presentaciones.',
       estado: 'confirmado',
       fechaHabilitada: true,
       servicios: [servicios.get('catering'), servicios.get('karaoke')]
@@ -245,8 +249,10 @@ async function main() {
       fecha: enDias(14),
       horaInicio: hora('18:00'),
       horaFin: hora('22:00'),
+      tipoEvento: 'Cumpleaños',
       cantidadPersonas: 80,
       lugar: 'Casona Las Acacias',
+      requerimientosTecnicos: 'Iluminación ambiental para jardín y punto eléctrico para DJ.',
       estado: 'registrada',
       fechaHabilitada: false,
       servicios: [servicios.get('catering')]
@@ -256,8 +262,10 @@ async function main() {
       fecha: enDias(7),
       horaInicio: hora('20:00'),
       horaFin: null,
+      tipoEvento: 'Fiesta de graduación',
       cantidadPersonas: 60,
       lugar: 'Salón del Parque',
+      requerimientosTecnicos: null,
       estado: 'pendiente',
       fechaHabilitada: false,
       servicios: [servicios.get('karaoke')]
