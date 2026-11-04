@@ -49,6 +49,7 @@ export default function CalendarioPage() {
 
   const [consulta, setConsulta] = useState({ fecha: hoy, horaInicio: '', horaFin: '' });
   const [resultado, setResultado] = useState(null);
+  const [revisada, setRevisada] = useState(null);
   const [errorConsulta, setErrorConsulta] = useState('');
 
   const eventosDelDia = (fecha) => eventos.filter((evento) => evento.fecha === fecha);
@@ -66,15 +67,27 @@ export default function CalendarioPage() {
     setMes(new Date(mes.getFullYear(), mes.getMonth() + delta, 1));
   }
 
-  async function consultar(event) {
-    event.preventDefault();
+  async function revisar(datos) {
     setErrorConsulta('');
     setResultado(null);
     try {
-      setResultado(await calendarioService.consultarDisponibilidad(consulta));
+      setResultado(await calendarioService.consultarDisponibilidad(datos));
+      setRevisada(datos);
     } catch (e) {
       setErrorConsulta(e.message);
     }
+  }
+
+  function consultar(event) {
+    event.preventDefault();
+    revisar(consulta);
+  }
+
+  // Al elegir una alternativa se va a ese día y se vuelve a consultar
+  function elegirAlternativa(alternativa) {
+    seleccionar(alternativa.fecha);
+    setConsulta(alternativa);
+    revisar(alternativa);
   }
 
   const delDia = eventosDelDia(seleccionado);
@@ -157,7 +170,7 @@ export default function CalendarioPage() {
             </div>
             <Boton type="submit"><span>Consultar disponibilidad</span><span aria-hidden="true">→</span></Boton>
             {errorConsulta && <Aviso tipo="error" className=""><p>{errorConsulta}</p></Aviso>}
-            <ResultadoDisponibilidad resultado={resultado} />
+            <ResultadoDisponibilidad resultado={resultado} consulta={revisada} onElegir={elegirAlternativa} />
           </form>
         </Panel>
       </div>

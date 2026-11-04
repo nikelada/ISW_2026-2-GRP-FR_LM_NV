@@ -161,6 +161,15 @@ export default function SolicitudesPage({ user, params }) {
     recargar();
   }
 
+  // Carga la alternativa en el formulario; después hay que guardar y revisar de nuevo
+  function usarAlternativa({ fecha, horaInicio, horaFin }) {
+    setResultado(null);
+    setForm({ ...aFormulario(seleccionada), fecha, horaInicio, horaFin });
+    setModo('editar');
+    setErrores({});
+    setAviso({ tipo: 'warning', texto: 'Se cargó la fecha y horario alternativos. Guarda la solicitud y vuelve a revisar la disponibilidad.' });
+  }
+
   async function agregarServicio() {
     if (!seleccionada || !servicioParaAgregar) return;
     setServicioProcesando('agregar');
@@ -240,6 +249,7 @@ export default function SolicitudesPage({ user, params }) {
               onQuitarServicio={quitarServicio}
               onEditar={editar}
               onRevisarFecha={revisarFecha}
+              onUsarAlternativa={usarAlternativa}
             />
           ) : (
             <>
@@ -294,7 +304,8 @@ function DetalleSolicitud({
   onAgregarServicio,
   onQuitarServicio,
   onEditar,
-  onRevisarFecha
+  onRevisarFecha,
+  onUsarAlternativa
 }) {
   if (!solicitud) {
     return (
@@ -416,7 +427,12 @@ function DetalleSolicitud({
           <strong>Pendiente de cálculo</strong>
         </div>
       </div>
-      <ResultadoDisponibilidad resultado={resultado} />
+      <ResultadoDisponibilidad
+        resultado={resultado}
+        consulta={puedeEditar && !confirmada ? { fecha: s.fecha, horaInicio: s.horaInicio, horaFin: s.horaFin, excluirId: s.id } : null}
+        textoElegir="Usar"
+        onElegir={onUsarAlternativa}
+      />
       <div className="grid gap-2.5">
         {puedeEditar && !confirmada && (
           <Boton onClick={onEditar}><span>{s.faltantes.length ? 'Completar información' : 'Editar solicitud'}</span><span aria-hidden="true">→</span></Boton>
