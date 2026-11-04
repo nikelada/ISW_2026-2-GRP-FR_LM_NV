@@ -73,12 +73,65 @@ model Solicitud {
   estado                 EstadoSolicitud     @default(pendiente)
   // true si la fecha y hora se revisaron y no chocan con nada
   fechaHabilitada        Boolean             @default(false)
+  cambios                SolicitudCambio[]
+  historial              HistorialEvento[]
   createdAt              DateTime            @default(now()) @db.Timestamp(6)
   updatedAt              DateTime            @updatedAt @db.Timestamp(6)
 
   @@index([clienteId])
   @@index([fecha])
   @@map("solicitudes")
+}
+
+enum EstadoCambio {
+  pendiente
+  aprobado
+  rechazado
+}
+
+// Cambio que pide el cliente sobre un evento ya confirmado
+model SolicitudCambio {
+  id                   Int               @id @default(autoincrement())
+  solicitudId          Int
+  solicitud            Solicitud         @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  // ej: { "horaFin": "23:59", "lugar": "Salón Sur" }
+  cambios              Json
+  motivo               String            @db.Text
+  estado               EstadoCambio      @default(pendiente)
+  registradoPor        String            @db.VarChar(150)
+  // lo que revisa gerencia antes de aprobar
+  revisionRecursos     Boolean           @default(false)
+  revisionAnticipacion Boolean           @default(false)
+  revisionCosto        Boolean           @default(false)
+  revisionOtrosEventos Boolean           @default(false)
+  revisadoPor          String?           @db.VarChar(150)
+  revisadoEn           DateTime?         @db.Timestamp(6)
+  // se llena cuando el cambio se aplica al evento
+  aplicadoPor          String?           @db.VarChar(150)
+  aplicadoEn           DateTime?         @db.Timestamp(6)
+  historial            HistorialEvento[]
+  createdAt            DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt            DateTime          @updatedAt @db.Timestamp(6)
+
+  @@index([solicitudId])
+  @@map("solicitudes_cambio")
+}
+
+// Un registro por cada dato que se le cambió al evento
+model HistorialEvento {
+  id            Int             @id @default(autoincrement())
+  solicitudId   Int
+  solicitud     Solicitud       @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  cambioId      Int
+  cambio        SolicitudCambio @relation(fields: [cambioId], references: [id], onDelete: Restrict)
+  campo         String          @db.VarChar(50)
+  valorAnterior String?         @db.Text
+  valorNuevo    String?         @db.Text
+  usuario       String          @db.VarChar(150)
+  createdAt     DateTime        @default(now()) @db.Timestamp(6)
+
+  @@index([solicitudId])
+  @@map("historial_eventos")
 }
 
 // Categoría utilizada para agrupar los servicios ofrecidos.
