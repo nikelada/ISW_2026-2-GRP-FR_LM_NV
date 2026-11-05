@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import EventosLayout from './components/EventosLayout.jsx';
 import AuthPage from './pages/AuthPage.jsx';
 import CalendarioPage from './pages/CalendarioPage.jsx';
+import CambiosPage from './pages/CambiosPage.jsx';
 import ClientesPage from './pages/ClientesPage.jsx';
 import ServiciosPage from './pages/ServiciosPage.jsx';
 import SolicitudesPage from './pages/SolicitudesPage.jsx';
@@ -9,12 +10,13 @@ import InventarioPage from './pages/InventarioPage.jsx';
 import { getCurrentUser } from './services/authService.js';
 import { clearSession, getStoredSession } from './utils/session.js';
 
-// Secciones de la aplicación (se navega con #/clave?parametros).
+// Secciones del menú (se navega con #/clave?parametros)
 const SECCIONES = [
   { clave: 'clientes', titulo: 'Clientes', Pagina: ClientesPage },
   { clave: 'solicitudes', titulo: 'Solicitudes', Pagina: SolicitudesPage },
   { clave: 'servicios', titulo: 'Servicios', Pagina: ServiciosPage },
   { clave: 'calendario', titulo: 'Calendario', Pagina: CalendarioPage },
+  { clave: 'cambios', titulo: 'Cambios', Pagina: CambiosPage },
   { clave: 'inventario', titulo: 'Inventario', Pagina: InventarioPage }
 ];
 

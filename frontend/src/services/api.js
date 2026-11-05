@@ -15,7 +15,7 @@ async function request(path, { method = 'GET', body } = {}) {
   });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    // `data` conserva los detalles del backend (p. ej. errores por campo).
+    // en data vienen los detalles del backend, por ejemplo los errores por campo
     throw Object.assign(new Error(data.message || 'Ocurrió un error inesperado.'), { status: response.status, data });
   }
   return data;

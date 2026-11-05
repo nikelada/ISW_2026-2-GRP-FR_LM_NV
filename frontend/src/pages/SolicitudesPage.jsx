@@ -12,9 +12,11 @@ import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
 import * as calendarioService from '../services/calendarioService.js';
+import * as cambioService from '../services/cambioService.js';
 import * as clienteService from '../services/clienteService.js';
 import * as solicitudService from '../services/solicitudService.js';
 import * as servicioService from '../services/servicioService.js';
+import { etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
@@ -62,7 +64,7 @@ function aFormulario(solicitud) {
 }
 
 // Solicitudes de eventos (siempre van asociadas a un cliente)
-export default function SolicitudesPage({ user, params }) {
+export default function SolicitudesPage({ user, params, onNavegar }) {
   const puedeEditar = esProduccion(user);
   const [filtro, setFiltro] = useState('');
   const { datos: solicitudes, cargando, error, recargar } = useFetch(useCallback(() => solicitudService.listar(filtro), [filtro]));
@@ -250,6 +252,7 @@ export default function SolicitudesPage({ user, params }) {
               onEditar={editar}
               onRevisarFecha={revisarFecha}
               onUsarAlternativa={usarAlternativa}
+              onRegistrarCambio={() => onNavegar(`cambios?nuevo=1&evento=${seleccionada.id}`)}
             />
           ) : (
             <>
@@ -305,7 +308,8 @@ function DetalleSolicitud({
   onQuitarServicio,
   onEditar,
   onRevisarFecha,
-  onUsarAlternativa
+  onUsarAlternativa,
+  onRegistrarCambio
 }) {
   if (!solicitud) {
     return (
@@ -337,7 +341,7 @@ function DetalleSolicitud({
       {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
       {confirmada ? (
         <Aviso tipo="success" titulo="Evento con fecha confirmada">
-          <p>Sus datos ya no se editan desde la solicitud.</p>
+          <p>Sus datos solo se modifican mediante un cambio aprobado por Gerencia.</p>
         </Aviso>
       ) : s.faltantes.length ? (
         <Aviso tipo="warning" titulo="Solicitud pendiente: falta información obligatoria">
@@ -438,7 +442,36 @@ function DetalleSolicitud({
           <Boton onClick={onEditar}><span>{s.faltantes.length ? 'Completar información' : 'Editar solicitud'}</span><span aria-hidden="true">→</span></Boton>
         )}
         {puedeRevisarFecha && <Boton variante="secundario" onClick={onRevisarFecha}>Revisar disponibilidad de la fecha</Boton>}
+        {puedeEditar && confirmada && (
+          <Boton onClick={onRegistrarCambio}><span>Registrar cambio solicitado</span><span aria-hidden="true">→</span></Boton>
+        )}
       </div>
+      {confirmada && <HistorialEvento key={s.id} solicitudId={s.id} />}
     </>
+  );
+}
+
+// Lo que se le ha cambiado al evento
+function HistorialEvento({ solicitudId }) {
+  const { datos: historial, cargando } = useFetch(useCallback(() => cambioService.historialDeEvento(solicitudId), [solicitudId]));
+  return (
+    <section className="mt-5 border-t border-stone-200 pt-4" aria-label="Historial de modificaciones">
+      <Antetitulo className="mb-2.5">Historial de modificaciones</Antetitulo>
+      {cargando && !historial.length ? <p className="text-xs text-stone-500">Cargando…</p> : !historial.length ? (
+        <p className="text-xs text-stone-500">Sin modificaciones registradas.</p>
+      ) : (
+        <ul className="grid gap-2.5 text-sm">
+          {historial.map((h) => (
+            <li key={h.id}>
+              <strong>{etiquetaCampo(h.campo)}</strong>: {formatearValor(h.campo, h.valorAnterior)} → {formatearValor(h.campo, h.valorNuevo)}
+              <small className="mt-0.5 block text-stone-500">
+                {new Date(h.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })} · aplicado por {h.usuario}
+                {h.cambio.revisadoPor ? ` · aprobado por ${h.cambio.revisadoPor}` : ''} (cambio #{h.cambio.id}: {h.cambio.motivo})
+              </small>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }
