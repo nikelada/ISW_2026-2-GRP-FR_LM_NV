@@ -15,7 +15,7 @@ const CAMPOS_OBLIGATORIOS = [
 ];
 
 const ESTADOS = ['pendiente', 'registrada', 'confirmado'];
-const INCLUIR_SOLICITUD = {
+export const INCLUIR_SOLICITUD = {
   cliente: { select: { id: true, nombre: true } },
   servicios: {
     include: {
