@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
+import EstadoCambio, { ESTADOS_CAMBIO } from '../components/EstadoCambio.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
-import Badge from '../components/ui/Badge.jsx';
 import Boton from '../components/ui/Boton.jsx';
 import Campo from '../components/ui/Campo.jsx';
 import ListaDatos from '../components/ui/ListaDatos.jsx';
@@ -16,12 +16,6 @@ import * as solicitudService from '../services/solicitudService.js';
 import { CAMPOS_EVENTO, etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esGerencia, esProduccion } from '../utils/roles.js';
-
-const ESTADOS_CAMBIO = {
-  pendiente: { texto: 'Pendiente de revisión', color: 'amarillo' },
-  aprobado: { texto: 'Aprobado', color: 'verde' },
-  rechazado: { texto: 'Rechazado', color: 'rojo' }
-};
 
 // Marcar un factor significa que ya se revisó, no que esté todo bien
 const FACTORES = [
@@ -62,16 +56,6 @@ function ImpactoOtrosEventos({ cambio }) {
 const CHECK = 'flex items-center gap-2 text-sm font-normal text-stone-800';
 
 const fechaHora = (valor) => new Date(valor).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' });
-
-function EstadoCambio({ cambio }) {
-  const { texto, color } = ESTADOS_CAMBIO[cambio.estado];
-  return (
-    <>
-      <Badge color={color} data-estado-cambio={cambio.estado}>{texto}</Badge>
-      {cambio.aplicadoEn && <Badge color="oscuro" data-estado-cambio="aplicado">Aplicado al evento</Badge>}
-    </>
-  );
-}
 
 const columnas = [
   { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (c) => `#${c.id}` },

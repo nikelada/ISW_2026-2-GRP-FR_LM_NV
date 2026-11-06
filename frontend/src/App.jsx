@@ -4,6 +4,7 @@ import AuthPage from './pages/AuthPage.jsx';
 import CalendarioPage from './pages/CalendarioPage.jsx';
 import CambiosPage from './pages/CambiosPage.jsx';
 import ClientesPage from './pages/ClientesPage.jsx';
+import HistorialPage from './pages/HistorialPage.jsx';
 import ServiciosPage from './pages/ServiciosPage.jsx';
 import SolicitudesPage from './pages/SolicitudesPage.jsx';
 import InventarioPage from './pages/InventarioPage.jsx';
@@ -17,6 +18,7 @@ const SECCIONES = [
   { clave: 'servicios', titulo: 'Servicios', Pagina: ServiciosPage },
   { clave: 'calendario', titulo: 'Calendario', Pagina: CalendarioPage },
   { clave: 'cambios', titulo: 'Cambios', Pagina: CambiosPage },
+  { clave: 'historial', titulo: 'Historial', Pagina: HistorialPage },
   { clave: 'inventario', titulo: 'Inventario', Pagina: InventarioPage }
 ];
 

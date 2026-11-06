@@ -88,6 +88,7 @@ export default function ClientesPage({ user, onNavegar }) {
         <span className="inline-flex gap-3.5">
           <Boton variante="enlace" onClick={() => editar(c)}>Editar</Boton>
           <Boton variante="enlace" onClick={() => onNavegar(`solicitudes?nueva=1&cliente=${c.id}`)}>Nueva solicitud</Boton>
+          <Boton variante="enlace" onClick={() => onNavegar(`historial?cliente=${c.id}`)}>Historial</Boton>
         </span>
       )
     });
