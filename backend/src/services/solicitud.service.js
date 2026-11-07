@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { fechaActual } from '../utils/fecha.js';
 import * as clienteService from './cliente.service.js';
 import { aRespuesta as aRespuestaServicio, INCLUIR_SERVICIO } from './servicio.service.js';
 
@@ -31,6 +32,16 @@ export const aFecha = (texto) => (texto ? new Date(`${texto}T00:00:00Z`) : null)
 export const aHora = (texto) => (texto ? new Date(`1970-01-01T${texto}:00Z`) : null);
 export const textoFecha = (valor) => (valor ? valor.toISOString().slice(0, 10) : null);
 export const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
+
+// No se aceptan fechas anteriores a hoy
+export function asegurarFechaNoPasada(fecha) {
+  if (fecha && fecha < textoFecha(fechaActual())) {
+    throw Object.assign(new Error('La fecha ya pasó; elige una fecha desde hoy en adelante.'), {
+      status: 400,
+      detalles: { errores: { fecha: 'La fecha no puede ser anterior a hoy.' } }
+    });
+  }
+}
 
 export function camposFaltantes(solicitud) {
   return CAMPOS_OBLIGATORIOS
@@ -116,6 +127,7 @@ export async function obtenerPorId(id) {
 }
 
 export async function crear(datos) {
+  asegurarFechaNoPasada(datos.fecha);
   await asegurarClienteRegistrado(datos.clienteId);
   const creada = await prisma.solicitud.create({ data: aDatos(datos), include: INCLUIR_SOLICITUD });
   return aRespuesta(creada);
@@ -127,6 +139,8 @@ export async function actualizar(id, datos) {
   if (actual.estado === 'confirmado') {
     throw Object.assign(new Error('El evento ya está confirmado; sus datos no se pueden editar desde la solicitud.'), { status: 409 });
   }
+  // Solo si cambió, para poder seguir completando una solicitud antigua
+  if (datos.fecha !== actual.fecha) asegurarFechaNoPasada(datos.fecha);
   if (datos.clienteId !== actual.clienteId) await asegurarClienteRegistrado(datos.clienteId);
 
   const data = aDatos(datos, actual.servicios);

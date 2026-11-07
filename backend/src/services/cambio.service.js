@@ -1,6 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { asegurarFechaSinConflicto, buscarConflictos } from './calendario.service.js';
-import { aFecha, aHora, obtenerPorId as obtenerEvento } from './solicitud.service.js';
+import { aFecha, aHora, asegurarFechaNoPasada, obtenerPorId as obtenerEvento } from './solicitud.service.js';
 
 const FACTORES = ['revisionRecursos', 'revisionAnticipacion', 'revisionCosto', 'revisionOtrosEventos'];
 const ESTADOS = ['pendiente', 'aprobado', 'rechazado'];
@@ -63,6 +63,7 @@ export async function registrar({ solicitudId, cambios, motivo }, usuario) {
   }
   const distintos = Object.fromEntries(Object.entries(cambios).filter(([campo, valor]) => evento[campo] !== valor));
   if (!Object.keys(distintos).length) throw httpError(400, 'Los nuevos valores son iguales a los actuales.');
+  asegurarFechaNoPasada(distintos.fecha);
   const propuesto = eventoConCambios(evento, distintos);
   if (propuesto.horaFin <= propuesto.horaInicio) {
     throw httpError(400, 'Revisa los datos del cambio.', { errores: { horaFin: 'La hora de término debe ser posterior a la de inicio.' } });

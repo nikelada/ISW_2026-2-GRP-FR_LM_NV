@@ -1,6 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { fechaActual } from '../utils/fecha.js';
-import { aFecha, aHora, aRespuesta, obtenerPorId, textoFecha, textoHora } from './solicitud.service.js';
+import { aFecha, aHora, aRespuesta, asegurarFechaNoPasada, obtenerPorId, textoFecha, textoHora } from './solicitud.service.js';
 
 const INCLUIR_CLIENTE = { cliente: { select: { id: true, nombre: true } } };
 // Cuántos días antes y después se buscan alternativas
@@ -35,6 +35,7 @@ export async function buscarConflictos({ fecha, horaInicio, horaFin, excluirId }
 }
 
 export async function consultarDisponibilidad(consulta) {
+  asegurarFechaNoPasada(consulta.fecha);
   const conflictos = await buscarConflictos(consulta);
   return { disponible: conflictos.length === 0, conflictos };
 }
