@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoBadge from '../components/EstadoBadge.jsx';
@@ -43,19 +43,32 @@ const columnas = [
 // Historial de un cliente: sus solicitudes, eventos y cambios
 export default function HistorialPage({ user, params }) {
   const puedeConsultar = esProduccion(user);
-  const { datos: clientes } = useFetch(useCallback(() => (puedeConsultar ? clienteService.listar() : Promise.resolve([])), [puedeConsultar]));
+  const [busqueda, setBusqueda] = useState('');
+  const [q, setQ] = useState('');
+  const { datos: encontrados } = useFetch(useCallback(() => (puedeConsultar && q ? clienteService.listar(q) : Promise.resolve([])), [puedeConsultar, q]));
   const [clienteId, setClienteId] = useState(params.get('cliente') || '');
   const { datos: historial, cargando, error } = useFetch(
     useCallback(() => (clienteId ? clienteService.historial(clienteId) : Promise.resolve(null)), [clienteId]),
     null
   );
   const [seleccionadoId, setSeleccionadoId] = useState(null);
+  const [filtro, setFiltro] = useState('');
   const registros = historial?.registros || [];
+  const visibles = filtro ? registros.filter((r) => r.estado === filtro) : registros;
   const seleccionado = registros.find((r) => r.id === seleccionadoId) || null;
+  const eventos = registros.filter(esEvento).length;
+  const cambios = registros.reduce((total, r) => total + r.cambios.length, 0);
 
-  function elegirCliente(id) {
-    setClienteId(id);
+  // Igual que en Clientes: espera a que se deje de escribir antes de buscar
+  useEffect(() => {
+    const timer = setTimeout(() => setQ(busqueda.trim()), 250);
+    return () => clearTimeout(timer);
+  }, [busqueda]);
+
+  function elegirCliente(cliente) {
+    setClienteId(String(cliente.id));
     setSeleccionadoId(null);
+    setBusqueda('');
   }
 
   if (!puedeConsultar) {
@@ -73,18 +86,37 @@ export default function HistorialPage({ user, params }) {
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
-            <select aria-label="Cliente" value={clienteId} onChange={(e) => elegirCliente(e.target.value)}>
-              <option value="">Selecciona un cliente registrado</option>
-              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.rut ? ` · ${c.rut}` : ''}</option>)}
+            <input type="search" placeholder="Buscar cliente por RUT, nombre, correo o teléfono" aria-label="Buscar cliente" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <select className="w-auto" aria-label="Filtrar por estado" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
+              <option value="">Todos los estados</option>
+              <option value="pendiente">Pendientes de información</option>
+              <option value="registrada">Registradas</option>
+              <option value="confirmado">Eventos confirmados</option>
             </select>
           </div>
+          {busqueda.trim() && q && (
+            <ul className="border-b border-stone-200 py-1 text-sm" aria-label="Clientes encontrados">
+              {encontrados.length ? encontrados.map((c) => (
+                <li key={c.id}>
+                  <button type="button" className="w-full px-3.5 py-2 text-left hover:bg-stone-50" onClick={() => elegirCliente(c)}>
+                    <strong>{c.nombre}</strong> <span className="text-stone-500">{c.rut || 'Sin RUT'} · {c.correo}</span>
+                  </button>
+                </li>
+              )) : <li className="px-3.5 py-2 text-stone-500">No hay clientes que coincidan con la búsqueda.</li>}
+            </ul>
+          )}
+          {historial && (
+            <p className="border-b border-stone-200 px-3.5 py-2.5 text-sm text-stone-600" data-resumen>
+              <strong className="text-stone-900">{historial.cliente.nombre}</strong>{historial.cliente.rut ? ` (${historial.cliente.rut})` : ''} · Solicitudes: <strong>{registros.length - eventos}</strong> · Eventos: <strong>{eventos}</strong> · Cambios solicitados: <strong>{cambios}</strong>
+            </p>
+          )}
           {error && <Aviso tipo="error" className="m-3.5">{error}</Aviso>}
           {!clienteId ? (
-            <Vacio>Selecciona un cliente para ver su historial.</Vacio>
+            <Vacio>Busca un cliente para ver su historial.</Vacio>
           ) : cargando && !historial ? (
             <Vacio>Cargando…</Vacio>
           ) : (
-            <DataTable columnas={columnas} datos={registros} vacio="Este cliente no tiene solicitudes registradas." seleccionadoId={seleccionadoId} onSeleccionar={(r) => setSeleccionadoId(r.id)} />
+            <DataTable columnas={columnas} datos={visibles} vacio={filtro ? 'No hay registros con este estado.' : 'Este cliente no tiene solicitudes registradas.'} seleccionadoId={seleccionadoId} onSeleccionar={(r) => setSeleccionadoId(r.id)} />
           )}
         </Panel>
         <Panel lateral>
