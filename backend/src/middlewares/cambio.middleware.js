@@ -43,7 +43,9 @@ export function validarSolicitudCambio(req, res, next) {
     else cambios[campo] = normalizar(campo, texto);
   }
   if (!motivo) errores.motivo = 'Indica el motivo del cambio.';
+  else if (motivo.length < 10) errores.motivo = 'El motivo debe tener al menos 10 caracteres.';
   else if (motivo.length > 1000) errores.motivo = 'El motivo no puede superar 1000 caracteres.';
+  else if (!/\p{L}/u.test(motivo)) errores.motivo = 'El motivo debe incluir letras.';
   if (Object.keys(errores).length) return res.status(400).json({ message: 'Revisa los datos del cambio.', errores });
   if (!Object.keys(cambios).length) return res.status(400).json({ message: 'Indica al menos un dato a cambiar.' });
 
