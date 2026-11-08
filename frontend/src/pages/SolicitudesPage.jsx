@@ -264,7 +264,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
                 <Campo etiqueta="Cliente" error={errores.clienteId}>
                   <select {...campo('clienteId')}>
                     <option value="">Selecciona un cliente registrado</option>
-                    {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.rut ? ` · ${c.rut}` : ''}</option>)}
                   </select>
                 </Campo>
                 <Campo etiqueta="Tipo de evento" error={errores.tipoEvento}><input type="text" maxLength={100} placeholder="Ej.: matrimonio, seminario" {...campo('tipoEvento')} /></Campo>

@@ -19,9 +19,11 @@ model User {
   @@map("users")
 }
 
-// Nombre, teléfono y correo son obligatorios
+// RUT, nombre, teléfono y correo son obligatorios
 model Cliente {
   id          Int         @id @default(autoincrement())
+  // opcional en la BD solo por los clientes que existían antes; al registrar o editar se pide
+  rut         String?     @unique @db.VarChar(12)
   nombre      String      @db.VarChar(150)
   telefono    String      @db.VarChar(30)
   correo      String      @db.VarChar(255)

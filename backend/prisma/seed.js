@@ -190,10 +190,10 @@ async function main() {
   let cambiosCreados = 0;
 
   const datosClientes = [
-    { nombre: 'Camila Rojas', telefono: '+56 9 8123 4567', correo: 'camila.rojas@example.com' },
-    { nombre: 'Tomás Herrera', telefono: '+56 9 7234 5678', correo: 'tomas.herrera@example.com' },
-    { nombre: 'Valentina Muñoz', telefono: '+56 9 6345 6789', correo: 'valentina.munoz@example.com' },
-    { nombre: 'Diego Fuentes', telefono: '+56 9 5456 7890', correo: 'diego.fuentes@example.com' }
+    { rut: '16234871-K', nombre: 'Camila Rojas', telefono: '+56 9 8123 4567', correo: 'camila.rojas@example.com' },
+    { rut: '18456239-1', nombre: 'Tomás Herrera', telefono: '+56 9 7234 5678', correo: 'tomas.herrera@example.com' },
+    { rut: '19872345-2', nombre: 'Valentina Muñoz', telefono: '+56 9 6345 6789', correo: 'valentina.munoz@example.com' },
+    { rut: '15678432-K', nombre: 'Diego Fuentes', telefono: '+56 9 5456 7890', correo: 'diego.fuentes@example.com' }
   ];
 
   const clientes = new Map();

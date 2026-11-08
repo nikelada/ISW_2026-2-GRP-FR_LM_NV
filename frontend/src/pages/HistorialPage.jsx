@@ -75,7 +75,7 @@ export default function HistorialPage({ user, params }) {
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
             <select aria-label="Cliente" value={clienteId} onChange={(e) => elegirCliente(e.target.value)}>
               <option value="">Selecciona un cliente registrado</option>
-              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre} · {c.correo}</option>)}
+              {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.rut ? ` · ${c.rut}` : ''}</option>)}
             </select>
           </div>
           {error && <Aviso tipo="error" className="m-3.5">{error}</Aviso>}
