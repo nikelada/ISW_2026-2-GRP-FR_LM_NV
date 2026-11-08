@@ -67,7 +67,12 @@ function aFormulario(solicitud) {
 export default function SolicitudesPage({ user, params, onNavegar }) {
   const puedeEditar = esProduccion(user);
   const [filtro, setFiltro] = useState('');
+  const [busqueda, setBusqueda] = useState('');
   const { datos: solicitudes, cargando, error, recargar } = useFetch(useCallback(() => solicitudService.listar(filtro), [filtro]));
+  const texto = busqueda.trim().toLowerCase();
+  const visibles = texto
+    ? solicitudes.filter((s) => `${s.cliente.nombre} ${s.tipoEvento || ''}`.toLowerCase().includes(texto))
+    : solicitudes;
   const { datos: clientes } = useFetch(useCallback(() => clienteService.listar(), []));
   const { datos: serviciosDisponibles, error: errorServicios } = useFetch(useCallback(() => servicioService.listar(), []));
 
@@ -217,6 +222,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
+            <input type="search" placeholder="Buscar por cliente o tipo de evento" aria-label="Buscar solicitudes" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
             <select className="w-auto" aria-label="Filtrar por estado" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
               <option value="">Todos los estados</option>
               <option value="pendiente">Pendientes de información</option>
@@ -227,7 +233,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
           {error && <Aviso tipo="error" className="m-3.5">{error}</Aviso>}
           {cargando && !solicitudes.length
             ? <Vacio>Cargando…</Vacio>
-            : <DataTable columnas={columnas} datos={solicitudes} vacio="No hay solicitudes registradas con este filtro." seleccionadoId={seleccionada?.id} onSeleccionar={seleccionar} />}
+            : <DataTable columnas={columnas} datos={visibles} vacio="No hay solicitudes que coincidan con la búsqueda o el filtro." seleccionadoId={seleccionada?.id} onSeleccionar={seleccionar} />}
         </Panel>
 
         <Panel lateral>
