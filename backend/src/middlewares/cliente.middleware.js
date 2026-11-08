@@ -21,7 +21,9 @@ export function validarCliente(req, res, next) {
   if (!rut) errores.rut = 'El RUT es obligatorio.';
   else if (!RUT_REGEX.test(rut)) errores.rut = 'El RUT no tiene un formato válido.';
   if (!nombre) errores.nombre = 'El nombre es obligatorio.';
+  else if (nombre.length < 2) errores.nombre = 'El nombre debe tener al menos 2 caracteres.';
   else if (nombre.length > 150) errores.nombre = 'El nombre no puede superar 150 caracteres.';
+  else if (!/\p{L}/u.test(nombre)) errores.nombre = 'El nombre debe incluir letras.';
   if (!telefono) errores.telefono = 'El teléfono es obligatorio.';
   else if (telefono.length > 30) errores.telefono = 'El teléfono no puede superar 30 caracteres.';
   else if (!TELEFONO_REGEX.test(telefono)) errores.telefono = 'El teléfono solo puede tener números, espacios, +, - y paréntesis.';
