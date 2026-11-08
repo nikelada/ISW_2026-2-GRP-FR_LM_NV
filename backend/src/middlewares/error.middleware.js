@@ -1,6 +1,5 @@
-// Único lugar del backend que arma una respuesta de error.
-// Los controladores solo hacen: catch (error) { next(error) }
-// Un servicio puede adjuntar `detalles` (p. ej. { errores }) que se agregan a la respuesta.
+// Acá se arman todas las respuestas de error; los controladores solo hacen next(error).
+// Si el servicio manda `detalles` (ej. errores por campo) se agregan a la respuesta.
 export function manejarErrores(error, req, res, next) {
   if (!error.status) {
     console.error(error);

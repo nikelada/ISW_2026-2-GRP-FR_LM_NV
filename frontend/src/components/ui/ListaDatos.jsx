@@ -1,4 +1,4 @@
-// Lista de pares etiqueta / valor: datos = [['Fecha', '...'], ...]. Los pares con valor null se omiten.
+// datos = [['Fecha', '...'], ...]; si el valor es null no se muestra
 export default function ListaDatos({ datos }) {
   return (
     <dl className="my-4 grid grid-cols-[140px_1fr] gap-x-3 gap-y-2 text-sm">

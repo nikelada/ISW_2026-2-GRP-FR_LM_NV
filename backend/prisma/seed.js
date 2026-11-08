@@ -1,4 +1,4 @@
-// Datos de prueba para demostrar clientes, servicios, solicitudes y calendario.
+// Datos de prueba: clientes, servicios, solicitudes, calendario y cambios.
 // Uso normal: npm run seed
 // Uso acumulativo: npm run seed -- --merge
 import { PrismaClient } from '@prisma/client';
@@ -132,6 +132,39 @@ async function crearSolicitudConServicios(datos, servicios) {
   });
 }
 
+const USUARIO_PRODUCCION = 'Leonardo Araya';
+const USUARIO_GERENCIA = 'Martina Fuentealba';
+const REVISION_COMPLETA = { revisionRecursos: true, revisionAnticipacion: true, revisionCosto: true, revisionOtrosEventos: true };
+
+// Si un cambio trae `anteriores` es porque ya se aplicó, así que también va al historial.
+async function crearCambios(solicitudId, cambios) {
+  for (const { anteriores, ...datos } of cambios) {
+    const revisado = datos.estado !== 'pendiente';
+    const cambio = await prisma.solicitudCambio.create({
+      data: {
+        solicitudId,
+        ...datos,
+        registradoPor: USUARIO_PRODUCCION,
+        ...(datos.estado === 'aprobado' ? REVISION_COMPLETA : {}),
+        ...(revisado ? { revisadoPor: USUARIO_GERENCIA, revisadoEn: new Date() } : {}),
+        ...(anteriores ? { aplicadoPor: USUARIO_PRODUCCION, aplicadoEn: new Date() } : {})
+      }
+    });
+    if (anteriores) {
+      await prisma.historialEvento.createMany({
+        data: Object.entries(datos.cambios).map(([campo, valor]) => ({
+          solicitudId,
+          cambioId: cambio.id,
+          campo,
+          valorAnterior: anteriores[campo],
+          valorNuevo: String(valor),
+          usuario: USUARIO_PRODUCCION
+        }))
+      });
+    }
+  }
+}
+
 async function main() {
   if (argumentosDesconocidos.length > 0) {
     throw new Error(`Opcion no reconocida: ${argumentosDesconocidos[0]}`);
@@ -154,12 +187,13 @@ async function main() {
   let serviciosCreados = 0;
   let solicitudesCreadas = 0;
   let solicitudesOmitidas = 0;
+  let cambiosCreados = 0;
 
   const datosClientes = [
-    { nombre: 'Camila Rojas', telefono: '+56 9 8123 4567', correo: 'camila.rojas@example.com' },
-    { nombre: 'Tomás Herrera', telefono: '+56 9 7234 5678', correo: 'tomas.herrera@example.com' },
-    { nombre: 'Valentina Muñoz', telefono: '+56 9 6345 6789', correo: 'valentina.munoz@example.com' },
-    { nombre: 'Diego Fuentes', telefono: '+56 9 5456 7890', correo: 'diego.fuentes@example.com' }
+    { rut: '16234871-K', nombre: 'Camila Rojas', telefono: '+56 9 8123 4567', correo: 'camila.rojas@example.com' },
+    { rut: '18456239-1', nombre: 'Tomás Herrera', telefono: '+56 9 7234 5678', correo: 'tomas.herrera@example.com' },
+    { rut: '19872345-2', nombre: 'Valentina Muñoz', telefono: '+56 9 6345 6789', correo: 'valentina.munoz@example.com' },
+    { rut: '15678432-K', nombre: 'Diego Fuentes', telefono: '+56 9 5456 7890', correo: 'diego.fuentes@example.com' }
   ];
 
   const clientes = new Map();
@@ -223,31 +257,55 @@ async function main() {
       fecha: enDias(7),
       horaInicio: hora('19:00'),
       horaFin: hora('23:30'),
+      tipoEvento: 'Matrimonio',
       cantidadPersonas: 120,
       lugar: 'Centro de Eventos Los Robles',
+      requerimientosTecnicos: 'Escenario de 6 x 4 m, dos micrófonos inalámbricos y conexión trifásica.',
       estado: 'confirmado',
       fechaHabilitada: true,
-      servicios: [servicios.get('catering'), servicios.get('sonido')]
+      servicios: [servicios.get('catering'), servicios.get('sonido')],
+      cambios: [
+        { cambios: { cantidadPersonas: 140 }, motivo: 'Se sumaron invitados de último momento.', estado: 'pendiente' },
+        { cambios: { horaFin: '23:59' }, motivo: 'Los novios quieren extender la fiesta.', estado: 'aprobado' }
+      ]
     },
     {
       clienteCorreo: 'tomas.herrera@example.com',
       fecha: enDias(10),
       horaInicio: hora('10:00'),
-      horaFin: hora('14:00'),
+      // 15:00 porque ya tiene aplicado el cambio de más abajo (antes era 14:00)
+      horaFin: hora('15:00'),
+      tipoEvento: 'Seminario corporativo',
       cantidadPersonas: 40,
       lugar: 'Hotel Costanera, salón B',
+      requerimientosTecnicos: 'Proyector, telón y conexión a internet para presentaciones.',
       estado: 'confirmado',
       fechaHabilitada: true,
-      servicios: [servicios.get('catering'), servicios.get('karaoke')]
+      servicios: [servicios.get('catering'), servicios.get('karaoke')],
+      cambios: [
+        {
+          cambios: { lugar: 'Terraza del hotel', cantidadPersonas: 60 },
+          motivo: 'La empresa quiere invitar a más colaboradores.',
+          estado: 'rechazado'
+        },
+        {
+          cambios: { horaFin: '15:00' },
+          motivo: 'Se agrega una charla al cierre del seminario.',
+          estado: 'aprobado',
+          anteriores: { horaFin: '14:00' }
+        }
+      ]
     },
     {
       clienteCorreo: 'valentina.munoz@example.com',
       fecha: enDias(14),
       horaInicio: hora('18:00'),
       horaFin: hora('22:00'),
+      tipoEvento: 'Cumpleaños',
       cantidadPersonas: 80,
       lugar: 'Casona Las Acacias',
-      estado: 'disponible_cotizar',
+      requerimientosTecnicos: 'Iluminación ambiental para jardín y punto eléctrico para DJ.',
+      estado: 'registrada',
       fechaHabilitada: false,
       servicios: [servicios.get('catering')]
     },
@@ -256,8 +314,10 @@ async function main() {
       fecha: enDias(7),
       horaInicio: hora('20:00'),
       horaFin: null,
+      tipoEvento: 'Fiesta de graduación',
       cantidadPersonas: 60,
       lugar: 'Salón del Parque',
+      requerimientosTecnicos: null,
       estado: 'pendiente',
       fechaHabilitada: false,
       servicios: [servicios.get('karaoke')]
@@ -274,19 +334,21 @@ async function main() {
       continue;
     }
 
-    const { clienteCorreo, servicios: _servicios, ...datosSolicitud } = datos;
-    await crearSolicitudConServicios(
+    const { clienteCorreo, servicios: _servicios, cambios = [], ...datosSolicitud } = datos;
+    const solicitud = await crearSolicitudConServicios(
       { ...datosSolicitud, clienteId: cliente.id },
       datos.servicios
     );
+    await crearCambios(solicitud.id, cambios);
     firmasExistentes.add(firma);
     solicitudesCreadas += 1;
+    cambiosCreados += cambios.length;
   }
 
   console.log(
     `Seed completado. Clientes nuevos: ${clientesCreados}; tipos nuevos: ${tiposCreados}; ` +
       `servicios nuevos: ${serviciosCreados}; solicitudes nuevas: ${solicitudesCreadas}; ` +
-      `solicitudes omitidas por duplicado: ${solicitudesOmitidas}.`
+      `cambios nuevos: ${cambiosCreados}; solicitudes omitidas por duplicado: ${solicitudesOmitidas}.`
   );
 }
 

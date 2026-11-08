@@ -19,9 +19,11 @@ model User {
   @@map("users")
 }
 
-// Datos obligatorios del cliente definidos por la empresa.
+// RUT, nombre, teléfono y correo son obligatorios
 model Cliente {
   id          Int         @id @default(autoincrement())
+  // opcional en la BD solo por los clientes que existían antes; al registrar o editar se pide
+  rut         String?     @unique @db.VarChar(12)
   nombre      String      @db.VarChar(150)
   telefono    String      @db.VarChar(30)
   correo      String      @db.VarChar(255)
@@ -34,8 +36,9 @@ model Cliente {
 
 enum EstadoSolicitud {
   pendiente
-  disponible_cotizar
-  // Lo asigna el proceso que confirma el evento; se usa para detectar conflictos de horario.
+  // ya tiene todos los datos obligatorios
+  registrada
+  // lo pone quien confirma el evento; con esto se ven los choques de horario
   confirmado
 }
 
@@ -55,26 +58,82 @@ enum EstadoVersionServicio {
   inactivo
 }
 
-// Solicitud de evento. Los datos pueden faltar: en ese caso queda pendiente.
+// Solicitud de evento. Si le falta algún dato queda pendiente
 model Solicitud {
   id                     Int                 @id @default(autoincrement())
   clienteId              Int
   cliente                Cliente             @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  tipoEvento             String?             @db.VarChar(100)
   fecha                  DateTime?           @db.Date
   horaInicio             DateTime?           @db.Time(0)
   horaFin                DateTime?           @db.Time(0)
   cantidadPersonas       Int?
   lugar                  String?             @db.VarChar(255)
+  requerimientosTecnicos String?             @db.Text
+  // servicios adicionales (del catálogo)
   servicios              SolicitudServicio[]
   estado                 EstadoSolicitud     @default(pendiente)
-  // La fecha y horario fueron revisados sin conflicto y pueden continuar a confirmación.
+  // true si la fecha y hora se revisaron y no chocan con nada
   fechaHabilitada        Boolean             @default(false)
+  cambios                SolicitudCambio[]
+  historial              HistorialEvento[]
   createdAt              DateTime            @default(now()) @db.Timestamp(6)
   updatedAt              DateTime            @updatedAt @db.Timestamp(6)
 
   @@index([clienteId])
   @@index([fecha])
   @@map("solicitudes")
+}
+
+enum EstadoCambio {
+  pendiente
+  aprobado
+  rechazado
+}
+
+// Cambio que pide el cliente sobre un evento ya confirmado
+model SolicitudCambio {
+  id                   Int               @id @default(autoincrement())
+  solicitudId          Int
+  solicitud            Solicitud         @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  // ej: { "horaFin": "23:59", "lugar": "Salón Sur" }
+  cambios              Json
+  motivo               String            @db.Text
+  estado               EstadoCambio      @default(pendiente)
+  registradoPor        String            @db.VarChar(150)
+  // lo que revisa gerencia antes de aprobar
+  revisionRecursos     Boolean           @default(false)
+  revisionAnticipacion Boolean           @default(false)
+  revisionCosto        Boolean           @default(false)
+  revisionOtrosEventos Boolean           @default(false)
+  revisadoPor          String?           @db.VarChar(150)
+  revisadoEn           DateTime?         @db.Timestamp(6)
+  // se llena cuando el cambio se aplica al evento
+  aplicadoPor          String?           @db.VarChar(150)
+  aplicadoEn           DateTime?         @db.Timestamp(6)
+  historial            HistorialEvento[]
+  createdAt            DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt            DateTime          @updatedAt @db.Timestamp(6)
+
+  @@index([solicitudId])
+  @@map("solicitudes_cambio")
+}
+
+// Un registro por cada dato que se le cambió al evento
+model HistorialEvento {
+  id            Int             @id @default(autoincrement())
+  solicitudId   Int
+  solicitud     Solicitud       @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  cambioId      Int
+  cambio        SolicitudCambio @relation(fields: [cambioId], references: [id], onDelete: Restrict)
+  campo         String          @db.VarChar(50)
+  valorAnterior String?         @db.Text
+  valorNuevo    String?         @db.Text
+  usuario       String          @db.VarChar(150)
+  createdAt     DateTime        @default(now()) @db.Timestamp(6)
+
+  @@index([solicitudId])
+  @@map("historial_eventos")
 }
 
 // Categoría utilizada para agrupar los servicios ofrecidos.

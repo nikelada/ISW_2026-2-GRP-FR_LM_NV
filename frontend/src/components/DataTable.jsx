@@ -1,6 +1,6 @@
 import Vacio from './ui/Vacio.jsx';
 
-// Tabla genérica: no sabe qué es un cliente ni una solicitud, solo dibuja filas.
+// Tabla genérica, solo dibuja las filas que le pasen
 export default function DataTable({ columnas, datos, vacio, seleccionadoId, onSeleccionar }) {
   if (!datos.length) return <Vacio>{vacio}</Vacio>;
 

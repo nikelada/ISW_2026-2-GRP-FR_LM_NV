@@ -66,7 +66,7 @@ El backend siembra estas cuentas en el primer arranque:
 
 ## Datos de prueba
 
-Para cargar clientes y solicitudes de ejemplo (incluidos eventos con fecha confirmada), ejecuta dentro de `backend/`:
+Para cargar clientes y solicitudes de ejemplo (incluidos eventos con fecha confirmada y cambios solicitados sobre ellos), ejecuta dentro de `backend/`:
 
 ```bash
 npm run seed

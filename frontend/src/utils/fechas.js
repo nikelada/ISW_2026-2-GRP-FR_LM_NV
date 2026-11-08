@@ -1,4 +1,4 @@
-// Funciones puras para mostrar fechas (AAAA-MM-DD) y horarios (HH:MM) del backend.
+// Para mostrar las fechas (AAAA-MM-DD) y horas (HH:MM) que manda el backend
 export function formatearFecha(fecha, opciones = { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }) {
   if (!fecha) return '';
   const [year, month, day] = fecha.split('-').map(Number);

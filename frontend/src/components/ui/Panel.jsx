@@ -1,4 +1,4 @@
-// Contenedor blanco con borde. `lateral` lo deja fijo al costado mientras se recorre la lista.
+// Caja blanca con borde. Con `lateral` queda pegada al costado al hacer scroll
 export default function Panel({ lateral = false, className = '', children, ...props }) {
   const Etiqueta = lateral ? 'aside' : 'section';
   return (
