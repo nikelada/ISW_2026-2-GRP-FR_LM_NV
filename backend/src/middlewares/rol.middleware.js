@@ -2,6 +2,7 @@
 // usuario = Producción y Comercial, manager = Gerencia, admin = acceso completo.
 export const ROLES_PRODUCCION = ['usuario', 'admin'];
 export const ROLES_GERENCIA = ['manager', 'admin'];
+export const ROLES_ADMIN = ['admin'];
 
 // Se usa después de requireAuth: decide si el rol del usuario puede continuar.
 export function autorizarRol(roles) {
