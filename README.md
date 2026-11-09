@@ -82,6 +82,8 @@ Solo inserta datos si todavía no hay clientes registrados. Las fechas se calcul
 
 Para cambiar el modelo de datos, edita `backend/prisma/schema.prisma` y ejecuta `npm run migrate` dentro de `backend/` para crear la migración.
 
+La guía de los flujos de recursos, personal eventual y cierre de eventos está en [docs/guia-operaciones-recursos-y-cierre.md](./docs/guia-operaciones-recursos-y-cierre.md).
+
 ## Notas
 
 Establece un `JWT_SECRET` robusto, sirve la aplicación mediante HTTPS y mueve los tokens a cookies httpOnly seguras antes del despliegue.
