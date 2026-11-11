@@ -1,5 +1,5 @@
 import { prisma } from '../config/prisma.js';
-import { asegurarFechaSinConflicto, buscarConflictos } from './calendario.service.js';
+import { asegurarFechaLibre, buscarConflictos } from './calendario.service.js';
 import { aFecha, aHora, asegurarFechaNoPasada, obtenerPorId as obtenerEvento } from './solicitud.service.js';
 
 const FACTORES = ['revisionRecursos', 'revisionAnticipacion', 'revisionCosto', 'revisionOtrosEventos'];
@@ -107,7 +107,7 @@ export async function aplicar(id, usuario) {
   if (evento.estado !== 'confirmado') throw httpError(409, 'El evento ya no está confirmado.');
   const nuevo = eventoConCambios(evento, cambio.cambios);
   if (nuevo.horaFin <= nuevo.horaInicio) throw httpError(409, 'Con los datos actuales del evento, el horario aprobado no es válido.');
-  if (cambiaHorario(cambio.cambios)) await asegurarFechaSinConflicto(nuevo);
+  if (cambiaHorario(cambio.cambios)) await asegurarFechaLibre(nuevo);
 
   const campos = Object.keys(cambio.cambios);
   await prisma.$transaction([
