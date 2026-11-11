@@ -1,7 +1,7 @@
 import Boton from './ui/Boton.jsx';
 import { areaDelRol } from '../utils/roles.js';
 
-// Marco de la aplicación: barra superior con navegación entre secciones.
+// Layout general: barra de arriba con el menú
 export default function EventosLayout({ user, secciones, activa, onNavegar, onLogout, children }) {
   return (
     <div className="min-h-screen">

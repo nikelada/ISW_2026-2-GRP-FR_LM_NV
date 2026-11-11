@@ -12,13 +12,15 @@ import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
 import * as calendarioService from '../services/calendarioService.js';
+import * as cambioService from '../services/cambioService.js';
 import * as clienteService from '../services/clienteService.js';
 import * as solicitudService from '../services/solicitudService.js';
 import * as servicioService from '../services/servicioService.js';
+import { etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
-const VACIO = { clienteId: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '' };
+const VACIO = { clienteId: '', tipoEvento: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '', requerimientosTecnicos: '' };
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
   style: 'currency',
@@ -40,7 +42,16 @@ const sinDato = (texto = '—') => <span className="text-xs text-amber-700">{tex
 
 const columnas = [
   { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (s) => `#${s.id}` },
-  { campo: 'cliente', titulo: 'Cliente', render: (s) => <strong>{s.cliente.nombre}</strong> },
+  {
+    campo: 'cliente',
+    titulo: 'Cliente',
+    render: (s) => (
+      <>
+        <strong>{s.cliente.nombre}</strong>
+        <small className="block text-stone-500">{s.tipoEvento || sinDato('Sin tipo de evento')}</small>
+      </>
+    )
+  },
   { campo: 'fecha', titulo: 'Fecha', className: 'whitespace-nowrap', render: (s) => (s.fecha ? formatearFecha(s.fecha) : sinDato('Sin fecha')) },
   { campo: 'horario', titulo: 'Horario', className: 'whitespace-nowrap', render: (s) => formatearHorario(s) || sinDato('Sin horario') },
   { campo: 'cantidadPersonas', titulo: 'Personas', render: (s) => s.cantidadPersonas ?? sinDato() },
@@ -52,11 +63,16 @@ function aFormulario(solicitud) {
   return Object.fromEntries(Object.keys(VACIO).map((campo) => [campo, solicitud[campo] ?? '']));
 }
 
-// Registrar solicitudes asociadas a un cliente registrado.
-export default function SolicitudesPage({ user, params }) {
+// Solicitudes de eventos (siempre van asociadas a un cliente)
+export default function SolicitudesPage({ user, params, onNavegar }) {
   const puedeEditar = esProduccion(user);
   const [filtro, setFiltro] = useState('');
+  const [busqueda, setBusqueda] = useState('');
   const { datos: solicitudes, cargando, error, recargar } = useFetch(useCallback(() => solicitudService.listar(filtro), [filtro]));
+  const texto = busqueda.trim().toLowerCase();
+  const visibles = texto
+    ? solicitudes.filter((s) => `${s.cliente.nombre} ${s.tipoEvento || ''}`.toLowerCase().includes(texto))
+    : solicitudes;
   const { datos: clientes } = useFetch(useCallback(() => clienteService.listar(), []));
   const { datos: serviciosDisponibles, error: errorServicios } = useFetch(useCallback(() => servicioService.listar(), []));
 
@@ -72,8 +88,8 @@ export default function SolicitudesPage({ user, params }) {
   const [resultado, setResultado] = useState(null);
   const idInicial = Number(params.get('id')) || null;
 
-  // Mantiene el detalle sincronizado con la última carga de la lista
-  // y abre la solicitud indicada en la URL (p. ej. desde el calendario).
+  // Actualiza el detalle cuando se recarga la lista y abre la solicitud que venga en la URL
+  // (por ejemplo cuando se llega desde el calendario)
   useEffect(() => {
     const id = seleccionada?.id ?? idInicial;
     if (!id) return;
@@ -140,7 +156,7 @@ export default function SolicitudesPage({ user, params }) {
     }
   }
 
-  // Revisa la fecha y horario de la solicitud contra los eventos confirmados.
+  // Revisa si la fecha y hora chocan con algún evento confirmado
   async function revisarFecha() {
     setAviso(null);
     try {
@@ -150,6 +166,15 @@ export default function SolicitudesPage({ user, params }) {
       else setAviso({ tipo: 'error', texto: e.message });
     }
     recargar();
+  }
+
+  // Carga la alternativa en el formulario; después hay que guardar y revisar de nuevo
+  function usarAlternativa({ fecha, horaInicio, horaFin }) {
+    setResultado(null);
+    setForm({ ...aFormulario(seleccionada), fecha, horaInicio, horaFin });
+    setModo('editar');
+    setErrores({});
+    setAviso({ tipo: 'warning', texto: 'Se cargó la fecha y horario alternativos. Guarda la solicitud y vuelve a revisar la disponibilidad.' });
   }
 
   async function agregarServicio() {
@@ -191,23 +216,24 @@ export default function SolicitudesPage({ user, params }) {
 
   return (
     <>
-      <EncabezadoPagina antetitulo="Gestión" titulo="Solicitudes de eventos" descripcion="Solicitudes registradas y su estado para continuar a cotización.">
+      <EncabezadoPagina antetitulo="Gestión" titulo="Solicitudes de eventos" descripcion="Solicitudes de eventos asociadas a clientes registrados y su estado.">
         {puedeEditar && <Boton onClick={nueva}><span>Nueva solicitud</span><span aria-hidden="true">+</span></Boton>}
       </EncabezadoPagina>
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
+            <input type="search" placeholder="Buscar por cliente o tipo de evento" aria-label="Buscar solicitudes" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
             <select className="w-auto" aria-label="Filtrar por estado" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
               <option value="">Todos los estados</option>
               <option value="pendiente">Pendientes de información</option>
-              <option value="disponible_cotizar">Disponibles para cotizar</option>
+              <option value="registrada">Registradas</option>
               <option value="confirmado">Fecha confirmada</option>
             </select>
           </div>
           {error && <Aviso tipo="error" className="m-3.5">{error}</Aviso>}
           {cargando && !solicitudes.length
             ? <Vacio>Cargando…</Vacio>
-            : <DataTable columnas={columnas} datos={solicitudes} vacio="No hay solicitudes registradas con este filtro." seleccionadoId={seleccionada?.id} onSeleccionar={seleccionar} />}
+            : <DataTable columnas={columnas} datos={visibles} vacio="No hay solicitudes que coincidan con la búsqueda o el filtro." seleccionadoId={seleccionada?.id} onSeleccionar={seleccionar} />}
         </Panel>
 
         <Panel lateral>
@@ -231,6 +257,8 @@ export default function SolicitudesPage({ user, params }) {
               onQuitarServicio={quitarServicio}
               onEditar={editar}
               onRevisarFecha={revisarFecha}
+              onUsarAlternativa={usarAlternativa}
+              onRegistrarCambio={() => onNavegar(`cambios?nuevo=1&evento=${seleccionada.id}`)}
             />
           ) : (
             <>
@@ -242,9 +270,10 @@ export default function SolicitudesPage({ user, params }) {
                 <Campo etiqueta="Cliente" error={errores.clienteId}>
                   <select {...campo('clienteId')}>
                     <option value="">Selecciona un cliente registrado</option>
-                    {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}
+                    {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.rut ? ` · ${c.rut}` : ''}</option>)}
                   </select>
                 </Campo>
+                <Campo etiqueta="Tipo de evento" error={errores.tipoEvento}><input type="text" maxLength={100} placeholder="Ej.: matrimonio, seminario" {...campo('tipoEvento')} /></Campo>
                 <Campo etiqueta="Fecha" error={errores.fecha}><input type="date" {...campo('fecha')} /></Campo>
                 <div className="grid grid-cols-2 gap-3">
                   <Campo etiqueta="Hora de inicio" error={errores.horaInicio}><input type="time" {...campo('horaInicio')} /></Campo>
@@ -252,7 +281,8 @@ export default function SolicitudesPage({ user, params }) {
                 </div>
                 <Campo etiqueta="Cantidad de personas" error={errores.cantidadPersonas}><input type="number" min="1" step="1" {...campo('cantidadPersonas')} /></Campo>
                 <Campo etiqueta="Lugar" error={errores.lugar}><input type="text" maxLength={255} {...campo('lugar')} /></Campo>
-                <p className="text-xs text-stone-500">El cliente es obligatorio. Los servicios se asociarán después de registrar la solicitud. Si falta algún otro dato, la solicitud quedará pendiente hasta completarla.</p>
+                <Campo etiqueta="Requerimientos técnicos" error={errores.requerimientosTecnicos}><textarea rows={3} maxLength={2000} {...campo('requerimientosTecnicos')} /></Campo>
+                <p className="text-xs text-stone-500">El cliente es obligatorio. Los servicios adicionales se asocian después de guardar la solicitud. Si falta algún otro dato, la solicitud quedará pendiente hasta completarla.</p>
                 <div className="flex gap-2.5">
                   <Boton type="submit" className="flex-1" disabled={guardando}>
                     <span>{modo === 'editar' ? 'Guardar cambios' : 'Registrar solicitud'}</span><span aria-hidden="true">→</span>
@@ -283,7 +313,9 @@ function DetalleSolicitud({
   onAgregarServicio,
   onQuitarServicio,
   onEditar,
-  onRevisarFecha
+  onRevisarFecha,
+  onUsarAlternativa,
+  onRegistrarCambio
 }) {
   if (!solicitud) {
     return (
@@ -315,25 +347,27 @@ function DetalleSolicitud({
       {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
       {confirmada ? (
         <Aviso tipo="success" titulo="Evento con fecha confirmada">
-          <p>Sus datos ya no se editan desde la solicitud.</p>
+          <p>Sus datos solo se modifican mediante un cambio aprobado por Gerencia.</p>
         </Aviso>
       ) : s.faltantes.length ? (
-        <Aviso tipo="warning" titulo="Falta información para pasar a cotización">
+        <Aviso tipo="warning" titulo="Solicitud pendiente: falta información obligatoria">
           <ul>{s.faltantes.map((f) => <li key={f}>{f}</li>)}</ul>
         </Aviso>
       ) : (
-        <Aviso tipo="success" titulo="Información completa">
-          <p>La solicitud está disponible para continuar al proceso de cotización.</p>
+        <Aviso tipo="success" titulo="Solicitud registrada">
+          <p>Tiene toda la información obligatoria y puede continuar con las siguientes etapas del proceso.</p>
         </Aviso>
       )}
       <ListaDatos datos={[
+        ['Tipo de evento', s.tipoEvento || '—'],
         ['Fecha', s.fecha ? formatearFecha(s.fecha) : '—'],
         ['Horario', formatearHorario(s) || '—'],
         ['Cantidad de personas', s.cantidadPersonas ?? '—'],
-        ['Lugar', s.lugar || '—']
+        ['Lugar', s.lugar || '—'],
+        ['Requerimientos técnicos', s.requerimientosTecnicos || '—']
       ]} />
       <div className="mb-4 border-t border-stone-200 pt-4">
-        <Antetitulo className="mb-2">Servicios necesarios</Antetitulo>
+        <Antetitulo className="mb-2">Servicios adicionales</Antetitulo>
         {servicios.length ? (
           <ul className="mb-3 grid gap-2 text-sm">
             {servicios.map((servicio) => (
@@ -403,13 +437,47 @@ function DetalleSolicitud({
           <strong>Pendiente de cálculo</strong>
         </div>
       </div>
-      <ResultadoDisponibilidad resultado={resultado} />
+      <ResultadoDisponibilidad
+        resultado={resultado}
+        consulta={puedeEditar && !confirmada ? { fecha: s.fecha, horaInicio: s.horaInicio, horaFin: s.horaFin, excluirId: s.id } : null}
+        textoElegir="Usar"
+        onElegir={onUsarAlternativa}
+      />
       <div className="grid gap-2.5">
         {puedeEditar && !confirmada && (
           <Boton onClick={onEditar}><span>{s.faltantes.length ? 'Completar información' : 'Editar solicitud'}</span><span aria-hidden="true">→</span></Boton>
         )}
         {puedeRevisarFecha && <Boton variante="secundario" onClick={onRevisarFecha}>Revisar disponibilidad de la fecha</Boton>}
+        {puedeEditar && confirmada && (
+          <Boton onClick={onRegistrarCambio}><span>Registrar cambio solicitado</span><span aria-hidden="true">→</span></Boton>
+        )}
       </div>
+      {confirmada && <HistorialEvento key={s.id} solicitudId={s.id} />}
     </>
+  );
+}
+
+// Lo que se le ha cambiado al evento
+function HistorialEvento({ solicitudId }) {
+  const { datos: historial, cargando } = useFetch(useCallback(() => cambioService.historialDeEvento(solicitudId), [solicitudId]));
+  return (
+    <section className="mt-5 border-t border-stone-200 pt-4" aria-label="Historial de modificaciones">
+      <Antetitulo className="mb-2.5">Historial de modificaciones</Antetitulo>
+      {cargando && !historial.length ? <p className="text-xs text-stone-500">Cargando…</p> : !historial.length ? (
+        <p className="text-xs text-stone-500">Sin modificaciones registradas.</p>
+      ) : (
+        <ul className="grid gap-2.5 text-sm">
+          {historial.map((h) => (
+            <li key={h.id}>
+              <strong>{etiquetaCampo(h.campo)}</strong>: {formatearValor(h.campo, h.valorAnterior)} → {formatearValor(h.campo, h.valorNuevo)}
+              <small className="mt-0.5 block text-stone-500">
+                {new Date(h.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })} · aplicado por {h.usuario}
+                {h.cambio.revisadoPor ? ` · aprobado por ${h.cambio.revisadoPor}` : ''} (cambio #{h.cambio.id}: {h.cambio.motivo})
+              </small>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

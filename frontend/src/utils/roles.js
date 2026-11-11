@@ -11,6 +11,9 @@ export function esProduccion(user) {
 export function esGerencia(user) {
   return ROLES_GERENCIA.includes(user?.role);
 }
+export function esOperaciones(user) {
+  return ROLES_PRODUCCION.includes(user?.role);
+}
 
 export function areaDelRol(role) {
   return AREA_POR_ROL[role] || role;

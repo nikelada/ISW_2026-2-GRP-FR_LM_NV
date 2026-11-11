@@ -17,13 +17,15 @@ function textoOpcional(valor) {
   return texto || null;
 }
 
-// Los datos del evento pueden venir incompletos (la solicitud quedará pendiente),
-// pero lo que venga debe tener un formato válido y siempre debe indicarse el cliente.
-// Deja el cuerpo normalizado (horas como HH:MM, vacíos como null).
+// Los datos pueden venir incompletos (queda pendiente), pero lo que venga tiene que tener
+// formato válido y el cliente siempre va. Las horas quedan como HH:MM y lo vacío como null.
 export function validarSolicitud(req, res, next) {
   const errores = {};
   const clienteId = Number(req.body.clienteId);
   if (!Number.isInteger(clienteId) || clienteId <= 0) errores.clienteId = 'Selecciona un cliente registrado.';
+
+  const tipoEvento = textoOpcional(req.body.tipoEvento);
+  if (tipoEvento && tipoEvento.length > 100) errores.tipoEvento = 'El tipo de evento no puede superar 100 caracteres.';
 
   const fecha = textoOpcional(req.body.fecha);
   if (fecha && !esFechaValida(fecha)) errores.fecha = 'La fecha no es válida.';
@@ -45,16 +47,23 @@ export function validarSolicitud(req, res, next) {
   const lugar = textoOpcional(req.body.lugar);
   if (lugar && lugar.length > 255) errores.lugar = 'El lugar no puede superar 255 caracteres.';
 
+  const requerimientosTecnicos = textoOpcional(req.body.requerimientosTecnicos);
+  if (requerimientosTecnicos && requerimientosTecnicos.length > 2000) {
+    errores.requerimientosTecnicos = 'Los requerimientos técnicos no pueden superar 2000 caracteres.';
+  }
+
   if (Object.keys(errores).length) {
     return res.status(400).json({ message: 'Revisa los datos de la solicitud.', errores });
   }
   req.body = {
     clienteId,
+    tipoEvento,
     fecha,
     horaInicio: horaInicio && horaInicio.slice(0, 5),
     horaFin: horaFin && horaFin.slice(0, 5),
     cantidadPersonas,
-    lugar
+    lugar,
+    requerimientosTecnicos
   };
   next();
 }

@@ -1,4 +1,5 @@
 import * as clienteService from '../services/cliente.service.js';
+import * as historialService from '../services/historial.service.js';
 
 export async function listar(req, res, next) {
   try {
@@ -11,6 +12,14 @@ export async function listar(req, res, next) {
 export async function obtener(req, res, next) {
   try {
     res.json(await clienteService.obtenerPorId(req.params.id));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function historial(req, res, next) {
+  try {
+    res.json(await historialService.historialDeCliente(req.params.id));
   } catch (error) {
     next(error);
   }

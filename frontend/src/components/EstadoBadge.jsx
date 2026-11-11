@@ -2,11 +2,11 @@ import Badge from './ui/Badge.jsx';
 
 const ESTADOS = {
   pendiente: { texto: 'Pendiente de información', color: 'amarillo' },
-  disponible_cotizar: { texto: 'Disponible para cotizar', color: 'verde' },
+  registrada: { texto: 'Registrada', color: 'verde' },
   confirmado: { texto: 'Fecha confirmada', color: 'oscuro' }
 };
 
-// La marca de fecha habilitada solo aporta información mientras el evento no está confirmado.
+// "Fecha habilitada" solo se muestra si el evento todavía no está confirmado
 export default function EstadoBadge({ estado, fechaHabilitada = false }) {
   const { texto, color } = ESTADOS[estado] || { texto: estado, color: 'azul' };
   return (

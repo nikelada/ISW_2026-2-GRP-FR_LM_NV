@@ -26,7 +26,7 @@ function desdeIso(texto) {
   return new Date(year, month - 1, day);
 }
 
-// Días visibles del mes en semanas completas de lunes a domingo.
+// Días que se ven en el mes, en semanas completas de lunes a domingo
 function diasDelMes(mes) {
   const inicio = new Date(mes.getFullYear(), mes.getMonth(), 1);
   inicio.setDate(inicio.getDate() - ((inicio.getDay() + 6) % 7));
@@ -37,7 +37,7 @@ function diasDelMes(mes) {
   return dias;
 }
 
-// Consultar calendario y disponibilidad.
+// Calendario con los eventos y la consulta de disponibilidad
 export default function CalendarioPage() {
   const hoy = aIso(new Date());
   const [seleccionado, setSeleccionado] = useState(hoy);
@@ -49,6 +49,7 @@ export default function CalendarioPage() {
 
   const [consulta, setConsulta] = useState({ fecha: hoy, horaInicio: '', horaFin: '' });
   const [resultado, setResultado] = useState(null);
+  const [revisada, setRevisada] = useState(null);
   const [errorConsulta, setErrorConsulta] = useState('');
 
   const eventosDelDia = (fecha) => eventos.filter((evento) => evento.fecha === fecha);
@@ -66,15 +67,27 @@ export default function CalendarioPage() {
     setMes(new Date(mes.getFullYear(), mes.getMonth() + delta, 1));
   }
 
-  async function consultar(event) {
-    event.preventDefault();
+  async function revisar(datos) {
     setErrorConsulta('');
     setResultado(null);
     try {
-      setResultado(await calendarioService.consultarDisponibilidad(consulta));
+      setResultado(await calendarioService.consultarDisponibilidad(datos));
+      setRevisada(datos);
     } catch (e) {
       setErrorConsulta(e.message);
     }
+  }
+
+  function consultar(event) {
+    event.preventDefault();
+    revisar(consulta);
+  }
+
+  // Al elegir una alternativa se va a ese día y se vuelve a consultar
+  function elegirAlternativa(alternativa) {
+    seleccionar(alternativa.fecha);
+    setConsulta(alternativa);
+    revisar(alternativa);
   }
 
   const delDia = eventosDelDia(seleccionado);
@@ -137,7 +150,7 @@ export default function CalendarioPage() {
                   <span className="text-xs font-semibold">{formatearHorario(evento) || 'Sin horario'}</span>
                   <div>
                     <strong>{evento.cliente.nombre}</strong>
-                    <small className="mb-1 mt-0.5 block text-stone-500">{evento.lugar || 'Sin lugar'}{evento.cantidadPersonas ? ` · ${evento.cantidadPersonas} personas` : ''}</small>
+                    <small className="mb-1 mt-0.5 block text-stone-500">{evento.tipoEvento ? `${evento.tipoEvento} · ` : ''}{evento.lugar || 'Sin lugar'}{evento.cantidadPersonas ? ` · ${evento.cantidadPersonas} personas` : ''}</small>
                     <div><EstadoBadge estado={evento.estado} fechaHabilitada={evento.fechaHabilitada} /></div>
                   </div>
                   <a className="text-sm font-semibold text-teal-700 hover:underline" href={`#/solicitudes?id=${evento.id}`}>Ver</a>
@@ -157,7 +170,7 @@ export default function CalendarioPage() {
             </div>
             <Boton type="submit"><span>Consultar disponibilidad</span><span aria-hidden="true">→</span></Boton>
             {errorConsulta && <Aviso tipo="error" className=""><p>{errorConsulta}</p></Aviso>}
-            <ResultadoDisponibilidad resultado={resultado} />
+            <ResultadoDisponibilidad resultado={resultado} consulta={revisada} onElegir={elegirAlternativa} />
           </form>
         </Panel>
       </div>

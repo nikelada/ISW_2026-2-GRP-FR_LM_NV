@@ -4,7 +4,7 @@ const TIPOS = {
   error: 'border-red-600 bg-red-50 text-red-900'
 };
 
-// Mensaje destacado: tipo = 'success' | 'warning' | 'error'.
+// tipo puede ser 'success', 'warning' o 'error'
 export default function Aviso({ tipo = 'success', titulo, className = 'mb-3.5', children }) {
   return (
     <div

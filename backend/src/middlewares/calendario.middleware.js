@@ -1,6 +1,6 @@
 import { esFechaValida, esHoraValida } from './solicitud.middleware.js';
 
-// Rango de fechas que se muestra en el calendario (?desde=AAAA-MM-DD&hasta=AAAA-MM-DD).
+// Rango que muestra el calendario: ?desde=AAAA-MM-DD&hasta=AAAA-MM-DD
 export function validarRango(req, res, next) {
   const desde = String(req.query.desde || '');
   const hasta = String(req.query.hasta || '');
@@ -11,7 +11,7 @@ export function validarRango(req, res, next) {
   next();
 }
 
-// Consulta de disponibilidad (?fecha=&horaInicio=&horaFin=&excluirId=).
+// Para consultar disponibilidad: ?fecha=&horaInicio=&horaFin=&excluirId=
 export function validarConsultaDisponibilidad(req, res, next) {
   const fecha = String(req.query.fecha || '');
   const horaInicio = String(req.query.horaInicio || '');

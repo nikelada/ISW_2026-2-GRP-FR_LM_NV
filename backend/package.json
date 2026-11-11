@@ -4,12 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "prisma generate && npm run diagnostico && prisma migrate deploy && nodemon src/index.js",
-    "start": "prisma generate && npm run diagnostico && prisma migrate deploy && node src/index.js",
+    "dev": "prisma migrate deploy && prisma generate && nodemon src/index.js",
+    "start": "prisma migrate deploy && prisma generate && node src/index.js",
     "migrate": "prisma migrate dev",
     "seed": "node prisma/seed.js",
-    "diagnostico": "node prisma/diagnostico-solicitudes.js",
-    "reparar:solicitudes": "node prisma/reparar-solicitudes.js",
     "postinstall": "prisma generate"
   },
   "dependencies": {

@@ -1,6 +1,6 @@
 import Antetitulo from './ui/Antetitulo.jsx';
 
-// Título de cada pantalla, con acciones opcionales a la derecha.
+// Título de la página; lo que va en children queda a la derecha
 export default function EncabezadoPagina({ antetitulo, titulo, descripcion, children }) {
   return (
     <div className="mb-6 flex flex-wrap items-end justify-between gap-6">

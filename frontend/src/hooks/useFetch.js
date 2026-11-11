@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-// Pide datos al montar (y cada vez que cambia `fn`) y expone el estado de carga.
-// `fn` debe venir envuelta en useCallback para no pedir en cada render.
+// Carga los datos al montar y cada vez que cambia fn. Ojo: fn tiene que ir en useCallback,
+// si no se vuelve a pedir en cada render.
 export function useFetch(fn, inicial = []) {
   const [datos, setDatos] = useState(inicial);
   const [cargando, setCargando] = useState(true);

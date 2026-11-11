@@ -9,6 +9,7 @@ const router = Router();
 router.use(requireAuth);
 router.get('/', clienteController.listar);
 router.get('/:id', validarId, clienteController.obtener);
+router.get('/:id/historial', autorizarRol(ROLES_PRODUCCION), validarId, clienteController.historial);
 router.post('/', autorizarRol(ROLES_PRODUCCION), validarCliente, clienteController.crear);
 router.put('/:id', autorizarRol(ROLES_PRODUCCION), validarId, validarCliente, clienteController.actualizar);
 

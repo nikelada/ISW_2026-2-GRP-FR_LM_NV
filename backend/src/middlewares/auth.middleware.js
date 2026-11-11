@@ -19,7 +19,7 @@ export async function requireAuth(req, res, next) {
   }
 }
 
-// Revisa la FORMA de los datos de autenticación antes de llegar al controlador.
+// Valida que vengan los datos del login antes de pasar al controlador
 export function validarLogin(req, res, next) {
   const email = String(req.body.email || '').trim();
   const password = String(req.body.password || '');
