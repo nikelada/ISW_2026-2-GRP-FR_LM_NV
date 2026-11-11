@@ -83,6 +83,7 @@ model Solicitud {
   fechaHabilitada        Boolean             @default(false)
   cambios                SolicitudCambio[]
   historial              HistorialEvento[]
+  cotizaciones           Cotizacion[]
   createdAt              DateTime            @default(now()) @db.Timestamp(6)
   updatedAt              DateTime            @updatedAt @db.Timestamp(6)
 
@@ -177,6 +178,7 @@ model Servicio {
   versiones      VersionServicio[]
   cambios        CambioServicio[]
   solicitudes    SolicitudServicio[]
+  cotizaciones   DetalleCotizacion[]
   createdAt      DateTime                @default(now()) @db.Timestamp(6)
   updatedAt      DateTime                @updatedAt @db.Timestamp(6)
 
@@ -195,6 +197,7 @@ model VersionServicio {
   vigenciaDesde  DateTime              @db.Date
   vigenciaHasta  DateTime?             @db.Date
   solicitudes    SolicitudServicio[]
+  cotizaciones   DetalleCotizacion[]
 
   @@index([servicioId, estado])
   @@map("versiones_servicio")
@@ -228,6 +231,51 @@ model SolicitudServicio {
   @@index([servicioId])
   @@index([versionServicioId])
   @@map("solicitudes_servicios")
+}
+
+enum EstadoCotizacion {
+  // recién creada, espera la revisión de Gerencia
+  pendiente_revision
+  // Gerencia pidió corregirla antes de aprobar
+  modificaciones_solicitadas
+  aprobada
+  enviada
+  // respuesta del cliente (la registra Producción y Comercial)
+  aceptada
+  rechazada
+  sin_respuesta
+}
+
+// Cotización de una solicitud, calculada con los precios vigentes
+model Cotizacion {
+  id          Int                 @id @default(autoincrement())
+  solicitudId Int
+  solicitud   Solicitud           @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  estado      EstadoCotizacion    @default(pendiente_revision)
+  total       Int
+  detalles    DetalleCotizacion[]
+  createdAt   DateTime            @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime            @updatedAt @db.Timestamp(6)
+
+  @@index([solicitudId])
+  @@index([estado])
+  @@map("cotizaciones")
+}
+
+// Un servicio cotizado; la versión guarda el precio que tenía al cotizar
+model DetalleCotizacion {
+  id                Int             @id @default(autoincrement())
+  cotizacionId      Int
+  cotizacion        Cotizacion      @relation(fields: [cotizacionId], references: [id], onDelete: Cascade)
+  servicioId        Int
+  servicio          Servicio        @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  versionServicioId Int
+  versionServicio   VersionServicio @relation(fields: [versionServicioId], references: [id], onDelete: Restrict)
+
+  @@unique([cotizacionId, servicioId])
+  @@index([servicioId])
+  @@index([versionServicioId])
+  @@map("detalles_cotizacion")
 }
 
 enum TipoRecursoOperativo {
