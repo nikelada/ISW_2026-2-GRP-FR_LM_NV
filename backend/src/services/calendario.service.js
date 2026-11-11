@@ -138,7 +138,7 @@ export async function validarFechaSolicitud(id) {
 }
 
 // Para llamar antes de confirmar un evento: tira 409 si la fecha choca con otro
-export async function asegurarFechaSinConflicto(solicitud) {
+export async function asegurarFechaLibre(solicitud) {
   const { disponible, conflictos } = await consultarDisponibilidad({
     fecha: solicitud.fecha,
     horaInicio: solicitud.horaInicio,
