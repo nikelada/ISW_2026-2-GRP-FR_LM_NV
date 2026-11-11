@@ -5,6 +5,7 @@ import EstadoBadge from '../components/EstadoBadge.jsx';
 import EstadoCambio from '../components/EstadoCambio.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
+import Badge from '../components/ui/Badge.jsx';
 import ListaDatos from '../components/ui/ListaDatos.jsx';
 import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
@@ -15,6 +16,19 @@ import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
 const fechaHora = (valor) => new Date(valor).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' });
+
+// Resultados que entrega el módulo de cotizaciones
+const RESULTADOS_COTIZACION = {
+  aprobada: { texto: 'Cotización aprobada', color: 'verde' },
+  rechazada: { texto: 'Rechazada por el cliente', color: 'rojo' },
+  sin_respuesta: { texto: 'Sin respuesta del cliente', color: 'amarillo' }
+};
+
+function ResultadoCotizacion({ cotizacion }) {
+  if (!cotizacion) return <span className="text-xs text-stone-500">Sin cotización</span>;
+  const { texto, color } = RESULTADOS_COTIZACION[cotizacion.estado] || { texto: cotizacion.estado, color: 'azul' };
+  return <Badge color={color} data-cotizacion={cotizacion.estado}>{texto}</Badge>;
+}
 
 const esEvento = (registro) => registro.estado === 'confirmado';
 
@@ -40,6 +54,8 @@ const columnas = [
   { campo: 'cambios', titulo: 'Cambios', render: (r) => (r.cambios.length ? r.cambios.length : '—') }
 ];
 
+const columnaCotizacion = { campo: 'cotizacion', titulo: 'Cotización', render: (r) => <ResultadoCotizacion cotizacion={r.cotizacion} /> };
+
 // Historial de un cliente: sus solicitudes, eventos y cambios
 export default function HistorialPage({ user, params }) {
   const puedeConsultar = esProduccion(user);
@@ -58,6 +74,10 @@ export default function HistorialPage({ user, params }) {
   const seleccionado = registros.find((r) => r.id === seleccionadoId) || null;
   const eventos = registros.filter(esEvento).length;
   const cambios = registros.reduce((total, r) => total + r.cambios.length, 0);
+  // Lo de cotizaciones solo se muestra cuando ese módulo entregue resultados
+  const hayCotizaciones = registros.some((r) => r.cotizacion);
+  const sinConcretar = registros.filter((r) => ['rechazada', 'sin_respuesta'].includes(r.cotizacion?.estado)).length;
+  const columnasVisibles = hayCotizaciones ? [...columnas.slice(0, -1), columnaCotizacion, columnas.at(-1)] : columnas;
 
   // Igual que en Clientes: espera a que se deje de escribir antes de buscar
   useEffect(() => {
@@ -108,6 +128,7 @@ export default function HistorialPage({ user, params }) {
           {historial && (
             <p className="border-b border-stone-200 px-3.5 py-2.5 text-sm text-stone-600" data-resumen>
               <strong className="text-stone-900">{historial.cliente.nombre}</strong>{historial.cliente.rut ? ` (${historial.cliente.rut})` : ''} · Solicitudes: <strong>{registros.length - eventos}</strong> · Eventos: <strong>{eventos}</strong> · Cambios solicitados: <strong>{cambios}</strong>
+              {hayCotizaciones && <> · Rechazadas o sin respuesta: <strong>{sinConcretar}</strong></>}
             </p>
           )}
           {error && <Aviso tipo="error" className="m-3.5">{error}</Aviso>}
@@ -116,7 +137,7 @@ export default function HistorialPage({ user, params }) {
           ) : cargando && !historial ? (
             <Vacio>Cargando…</Vacio>
           ) : (
-            <DataTable columnas={columnas} datos={visibles} vacio={filtro ? 'No hay registros con este estado.' : 'Este cliente no tiene solicitudes registradas.'} seleccionadoId={seleccionadoId} onSeleccionar={(r) => setSeleccionadoId(r.id)} />
+            <DataTable columnas={columnasVisibles} datos={visibles} vacio={filtro ? 'No hay registros con este estado.' : 'Este cliente no tiene solicitudes registradas.'} seleccionadoId={seleccionadoId} onSeleccionar={(r) => setSeleccionadoId(r.id)} />
           )}
         </Panel>
         <Panel lateral>
@@ -154,6 +175,15 @@ function DetalleRegistro({ registro: r }) {
         ['Servicios adicionales', r.servicios.length ? r.servicios.map((s) => s.nombre).join('\n') : '—'],
         ['Registrada', fechaHora(r.createdAt)]
       ]} />
+      {r.cotizacion && (
+        <section className="mb-4 border-t border-stone-200 pt-4 text-sm" aria-label="Resultado de la cotización">
+          <div className="flex items-center justify-between gap-3">
+            <span className="text-stone-500">Resultado de la cotización</span>
+            <ResultadoCotizacion cotizacion={r.cotizacion} />
+          </div>
+          {r.cotizacion.detalle && <p className="mt-1.5">{r.cotizacion.detalle}</p>}
+        </section>
+      )}
       <section className="border-t border-stone-200 pt-4" aria-label="Cambios solicitados">
         <Antetitulo className="mb-2.5">Cambios solicitados</Antetitulo>
         {r.cambios.length ? (
