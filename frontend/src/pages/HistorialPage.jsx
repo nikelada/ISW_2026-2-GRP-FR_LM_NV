@@ -19,7 +19,7 @@ const fechaHora = (valor) => new Date(valor).toLocaleString('es-CL', { dateStyle
 
 // Resultados que entrega el módulo de cotizaciones
 const RESULTADOS_COTIZACION = {
-  aprobada: { texto: 'Cotización aprobada', color: 'verde' },
+  aceptada: { texto: 'Aceptada por el cliente', color: 'verde' },
   rechazada: { texto: 'Rechazada por el cliente', color: 'rojo' },
   sin_respuesta: { texto: 'Sin respuesta del cliente', color: 'amarillo' }
 };

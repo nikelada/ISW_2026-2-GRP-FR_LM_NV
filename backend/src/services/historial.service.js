@@ -2,7 +2,7 @@ import { prisma } from '../config/prisma.js';
 import * as clienteService from './cliente.service.js';
 import { aRespuesta, INCLUIR_SOLICITUD } from './solicitud.service.js';
 
-// Resultado de la cotización por solicitud: { estado, detalle } (aprobada, rechazada o sin_respuesta)
+// Resultado de la cotización por solicitud: { estado, detalle } (aceptada, rechazada o sin_respuesta)
 async function resultadosDeCotizacion(_solicitudIds) {
   return new Map();
 }
