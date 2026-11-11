@@ -32,14 +32,17 @@ export function validarFiltros(req, res, next) {
   next();
 }
 
-// Para calcular o crear una cotización: { solicitudId, servicios: [servicioId, ...] }
+// Para calcular o crear una cotización: { solicitudId, servicios?: [servicioId, ...] }
+// Si no se manda la lista se usan los servicios de la solicitud; si se manda, no puede venir vacía.
 export function validarCalculo(req, res, next) {
   const errores = {};
   const solicitudId = idPositivo(req.body.solicitudId);
   if (!solicitudId) errores.solicitudId = 'Selecciona una solicitud válida.';
 
-  let servicios = [];
-  if (!Array.isArray(req.body.servicios) || req.body.servicios.length === 0) {
+  let servicios;
+  if (req.body.servicios === undefined) {
+    servicios = undefined;
+  } else if (!Array.isArray(req.body.servicios) || req.body.servicios.length === 0) {
     errores.servicios = 'Selecciona al menos un servicio.';
   } else {
     servicios = req.body.servicios.map(idPositivo);

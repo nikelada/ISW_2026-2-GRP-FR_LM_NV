@@ -85,12 +85,21 @@ async function obtenerServiciosCotizables(ids) {
 }
 
 // Detalle y total de la cotización con los precios vigentes del catálogo. No guarda nada.
+// Sin lista de servicios se usan los que tiene la solicitud (RF-02), pero con su precio vigente.
 export async function calcular({ solicitudId, servicios: servicioIds }) {
   const solicitud = await solicitudService.obtenerPorId(solicitudId);
   asegurarSolicitudCotizable(solicitud);
 
+  const ids = servicioIds ?? solicitud.servicios.map((servicio) => servicio.id);
+  if (!ids.length) {
+    throw Object.assign(new Error('La solicitud no tiene servicios; indica los servicios a cotizar.'), {
+      status: 400,
+      detalles: { errores: { servicios: 'Selecciona al menos un servicio.' } }
+    });
+  }
+
   const horasEvento = horasDelEvento(solicitud.horaInicio, solicitud.horaFin);
-  const servicios = await obtenerServiciosCotizables(servicioIds);
+  const servicios = await obtenerServiciosCotizables(ids);
   const detalles = servicios.map((servicio) => lineaDetalle(servicio, servicio.versiones[0], horasEvento));
 
   return {
