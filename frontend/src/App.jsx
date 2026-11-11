@@ -9,6 +9,7 @@ import HistorialPage from './pages/HistorialPage.jsx';
 import ServiciosPage from './pages/ServiciosPage.jsx';
 import SolicitudesPage from './pages/SolicitudesPage.jsx';
 import InventarioPage from './pages/InventarioPage.jsx';
+import OperacionesPage from './pages/OperacionesPage.jsx';
 import { getCurrentUser } from './services/authService.js';
 import * as cambioService from './services/cambioService.js';
 import { esGerencia } from './utils/roles.js';
@@ -16,14 +17,15 @@ import { clearSession, getStoredSession } from './utils/session.js';
 
 // Secciones del menú (se navega con #/clave?parametros)
 const SECCIONES = [
-  { clave: 'clientes', titulo: 'Clientes', Pagina: ClientesPage },
-  { clave: 'solicitudes', titulo: 'Solicitudes', Pagina: SolicitudesPage },
-  { clave: 'servicios', titulo: 'Servicios', Pagina: ServiciosPage },
-  { clave: 'cotizaciones', titulo: 'Cotizaciones', Pagina: CotizacionesPage },
-  { clave: 'calendario', titulo: 'Calendario', Pagina: CalendarioPage },
-  { clave: 'cambios', titulo: 'Cambios', Pagina: CambiosPage },
-  { clave: 'historial', titulo: 'Historial', Pagina: HistorialPage },
-  { clave: 'inventario', titulo: 'Inventario', Pagina: InventarioPage }
+  { clave: 'clientes', titulo: 'Clientes', Pagina: ClientesPage, roles: ['usuario', 'admin'] },
+  { clave: 'solicitudes', titulo: 'Solicitudes', Pagina: SolicitudesPage, roles: ['usuario', 'admin'] },
+  { clave: 'servicios', titulo: 'Servicios', Pagina: ServiciosPage, roles: ['usuario', 'manager', 'admin'] },
+  { clave: 'cotizaciones', titulo: 'Cotizaciones', Pagina: CotizacionesPage, roles: ['usuario', 'manager', 'admin'] },
+  { clave: 'calendario', titulo: 'Calendario', Pagina: CalendarioPage, roles: ['usuario', 'manager', 'admin'] },
+  { clave: 'cambios', titulo: 'Cambios', Pagina: CambiosPage, roles: ['usuario', 'manager', 'admin'] },
+  { clave: 'historial', titulo: 'Historial', Pagina: HistorialPage, roles: ['usuario', 'admin'] },
+  { clave: 'inventario', titulo: 'Inventario', Pagina: InventarioPage, roles: ['manager', 'admin'] },
+  { clave: 'operaciones', titulo: 'Operaciones', Pagina: OperacionesPage, roles: ['manager', 'admin'] }
 ];
 
 function leerHash() {
@@ -38,7 +40,16 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [{ vista, params }, setRuta] = useState(leerHash);
   const [pendientes, setPendientes] = useState(0);
+  const seccionesPermitidas = SECCIONES.filter((s) => s.roles.includes(user?.role));
+  const seccionActual =
+    seccionesPermitidas.find((s) => s.clave === vista) ?? seccionesPermitidas[0];
 
+  useEffect(() => {
+    if (seccionActual && seccionActual.clave !== vista) {
+      location.hash = `/${seccionActual.clave}`;
+    }
+  }, [seccionActual, vista]);
+  
   useEffect(() => {
     if (!getStoredSession()?.token) {
       setChecking(false);
@@ -79,11 +90,28 @@ export default function App() {
   if (checking) return null;
   if (!user) return <AuthPage onAuthenticated={setUser} />;
 
-  const { Pagina } = SECCIONES.find((s) => s.clave === vista);
-  const secciones = SECCIONES.map((s) => (s.clave === 'cambios' && pendientes ? { ...s, titulo: `Cambios (${pendientes})` } : s));
+  if (!seccionActual) return <p>Este usuario no tiene pestañas disponibles.</p>;
+
+  const secciones = seccionesPermitidas.map((s) =>
+    s.clave === 'cambios' && pendientes
+      ? { ...s, titulo: `Cambios (${pendientes})` }
+      : s
+  );
+
   return (
-    <EventosLayout user={user} secciones={secciones} activa={vista} onNavegar={navegar} onLogout={logout}>
-      <Pagina key={`${vista}?${params}`} user={user} params={params} onNavegar={navegar} />
+    <EventosLayout
+      user={user}
+      secciones={secciones}
+      activa={seccionActual.clave}
+      onNavegar={navegar}
+      onLogout={logout}
+    >
+      <seccionActual.Pagina
+        key={`${seccionActual.clave}?${params}`}
+        user={user}
+        params={params}
+        onNavegar={navegar}
+      />
     </EventosLayout>
   );
 }

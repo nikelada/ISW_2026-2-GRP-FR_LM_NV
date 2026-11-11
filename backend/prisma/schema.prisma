@@ -13,6 +13,7 @@ model User {
   email     String   @unique @db.VarChar(255)
   password  String   @db.VarChar(255)
   role      String   @default("usuario") @db.VarChar(30)
+  cierresAprobados CierreEvento[]
   createdAt DateTime @default(now()) @db.Timestamp(6)
   updatedAt DateTime @updatedAt @db.Timestamp(6)
 
@@ -72,6 +73,11 @@ model Solicitud {
   requerimientosTecnicos String?             @db.Text
   // servicios adicionales (del catálogo)
   servicios              SolicitudServicio[]
+  reservasRecursos       ReservaRecurso[]
+  personalAsignado       PersonalEvento[]
+  tareas                 TareaEvento[]
+  pagos                  PagoEvento[]
+  cierre                 CierreEvento?
   estado                 EstadoSolicitud     @default(pendiente)
   // true si la fecha y hora se revisaron y no chocan con nada
   fechaHabilitada        Boolean             @default(false)
@@ -84,6 +90,17 @@ model Solicitud {
   @@index([clienteId])
   @@index([fecha])
   @@map("solicitudes")
+}
+
+model Inventario {
+  id        Int      @id @default(autoincrement())
+  nombre    String   @db.VarChar(150)
+  precio    Decimal  @db.Decimal(10, 2)
+  stock     Int
+  createdAt DateTime @default(now()) @db.Timestamp(6)
+  updatedAt DateTime @updatedAt @db.Timestamp(6)
+
+  @@map("inventario")
 }
 
 enum EstadoCambio {
@@ -261,13 +278,132 @@ model DetalleCotizacion {
   @@map("detalles_cotizacion")
 }
 
-model Inventario {
-  id        Int      @id @default(autoincrement())
-  nombre    String   @db.VarChar(150)
-  precio    Decimal  @db.Decimal(10, 2)
-  stock     Int
-  createdAt DateTime @default(now()) @db.Timestamp(6)
-  updatedAt DateTime @updatedAt @db.Timestamp(6)
+enum TipoRecursoOperativo {
+  equipo
+  espacio
+  vehiculo
+}
 
-  @@map("inventario")
+enum EstadoRecursoOperativo {
+  disponible
+  en_uso
+  mantencion
+  fuera_servicio
+}
+
+enum EstadoTareaEvento {
+  pendiente
+  completada
+}
+
+enum EstadoPagoEvento {
+  pendiente
+  pagado
+}
+
+enum EstadoCierreEvento {
+  pendiente
+  revision_gerencia
+  aprobado
+}
+
+model RecursoOperativo {
+  id        Int                    @id @default(autoincrement())
+  nombre    String                 @db.VarChar(150)
+  tipo      TipoRecursoOperativo
+  categoria String                 @db.VarChar(100)
+  estado    EstadoRecursoOperativo @default(disponible)
+  reservas  ReservaRecurso[]
+  createdAt DateTime               @default(now()) @db.Timestamp(6)
+  updatedAt DateTime               @updatedAt @db.Timestamp(6)
+
+  @@index([tipo, categoria, estado])
+  @@map("recursos_operativos")
+}
+
+model ReservaRecurso {
+  id          Int              @id @default(autoincrement())
+  recursoId   Int
+  solicitudId Int
+  recurso     RecursoOperativo @relation(fields: [recursoId], references: [id], onDelete: Restrict)
+  solicitud   Solicitud        @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  devueltoEn  DateTime?        @db.Timestamp(6)
+  createdAt   DateTime         @default(now()) @db.Timestamp(6)
+
+  @@unique([recursoId, solicitudId])
+  @@index([solicitudId])
+  @@map("reservas_recursos")
+}
+
+model PersonalEventual {
+  id           Int              @id @default(autoincrement())
+  nombre       String           @db.VarChar(150)
+  telefono     String?          @db.VarChar(30)
+  correo       String?          @db.VarChar(255)
+  esContacto   Boolean          @default(false)
+  asignaciones PersonalEvento[]
+  createdAt    DateTime         @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime         @updatedAt @db.Timestamp(6)
+
+  @@index([esContacto, nombre])
+  @@map("personal_eventual")
+}
+
+model PersonalEvento {
+  id          Int              @id @default(autoincrement())
+  solicitudId Int
+  personalId  Int
+  funcion     String?          @db.VarChar(100)
+  solicitud   Solicitud        @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  personal    PersonalEventual @relation(fields: [personalId], references: [id], onDelete: Restrict)
+  createdAt   DateTime         @default(now()) @db.Timestamp(6)
+
+  @@unique([solicitudId, personalId])
+  @@index([personalId])
+  @@map("personal_eventos")
+}
+
+model TareaEvento {
+  id          Int               @id @default(autoincrement())
+  solicitudId Int
+  titulo      String            @db.VarChar(150)
+  descripcion String?           @db.Text
+  estado      EstadoTareaEvento @default(pendiente)
+  solicitud   Solicitud         @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  createdAt   DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime          @updatedAt @db.Timestamp(6)
+
+  @@index([solicitudId, estado])
+  @@map("tareas_evento")
+}
+
+model PagoEvento {
+  id          Int              @id @default(autoincrement())
+  solicitudId Int
+  concepto    String           @db.VarChar(150)
+  monto       Decimal          @db.Decimal(10, 2)
+  estado      EstadoPagoEvento @default(pendiente)
+  solicitud   Solicitud        @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  createdAt   DateTime         @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime         @updatedAt @db.Timestamp(6)
+
+  @@index([solicitudId, estado])
+  @@map("pagos_evento")
+}
+
+model CierreEvento {
+  id                 Int                @id @default(autoincrement())
+  solicitudId        Int                @unique
+  estado             EstadoCierreEvento @default(pendiente)
+  encuestaConforme   Boolean?
+  encuestaComentario String?            @db.Text
+  solicitadoEn       DateTime?          @db.Timestamp(6)
+  aprobadoPorId      Int?
+  aprobadoPor        User?              @relation(fields: [aprobadoPorId], references: [id], onDelete: SetNull)
+  aprobadoEn         DateTime?          @db.Timestamp(6)
+  solicitud          Solicitud          @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  createdAt          DateTime           @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime           @updatedAt @db.Timestamp(6)
+
+  @@map("cierres_evento")
 }
