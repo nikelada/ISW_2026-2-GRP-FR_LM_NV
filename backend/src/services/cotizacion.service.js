@@ -117,15 +117,16 @@ export async function calcular({ solicitudId, servicios: servicioIds }) {
   };
 }
 
-// El detalle se arma con la versión de precio guardada y el horario actual de la solicitud.
-// Pendiente: las horas no se guardan en la cotización. Si a futuro se modifica el horario de la
-// solicitud, hay que recalcular las horas y el total de su cotización, y esa cotización tendrá que
-// volver a confirmarse (pasar otra vez por su revisión/aprobación) antes de seguir el proceso.
+// El detalle se arma con lo guardado al cotizar (versión de precio y horas del evento), así las
+// líneas siempre suman el total aunque después cambie el horario de la solicitud.
+// Pendiente (RF-10): si el horario cambió, la cotización queda desactualizada; habrá que recalcularla
+// y volver a pasarla por la revisión/aprobación de Gerencia antes de seguir el proceso.
 function aRespuesta(cotizacion) {
-  const { solicitud, detalles, ...datos } = cotizacion;
+  const { solicitud, detalles, horasEvento: horasGuardadas, ...datos } = cotizacion;
   const horaInicio = textoHora(solicitud.horaInicio);
   const horaFin = textoHora(solicitud.horaFin);
-  const horasEvento = horaInicio && horaFin ? horasDelEvento(horaInicio, horaFin) : 0;
+  // Las cotizaciones creadas antes de guardar las horas no las tienen: se usa el horario actual
+  const horasEvento = horasGuardadas ?? (horaInicio && horaFin ? horasDelEvento(horaInicio, horaFin) : 0);
   return {
     ...datos,
     solicitud: {
@@ -178,6 +179,7 @@ export async function crear(datos) {
       data: {
         solicitudId: datos.solicitudId,
         total: calculo.total,
+        horasEvento: calculo.solicitud.horasEvento,
         detalles: {
           create: calculo.detalles.map(({ servicioId, versionServicioId }) => ({ servicioId, versionServicioId }))
         }

@@ -253,6 +253,8 @@ model Cotizacion {
   solicitud   Solicitud           @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
   estado      EstadoCotizacion    @default(pendiente_revision)
   total       Int
+  // horas del evento al cotizar; null solo en cotizaciones creadas antes de guardar este dato
+  horasEvento Int?
   detalles    DetalleCotizacion[]
   createdAt   DateTime            @default(now()) @db.Timestamp(6)
   updatedAt   DateTime            @updatedAt @db.Timestamp(6)
