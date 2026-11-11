@@ -3,7 +3,10 @@ import * as servicioController from '../controllers/servicio.controller.js';
 import * as cambioServicioController from '../controllers/cambioServicio.controller.js';
 import { requireAuth } from '../middlewares/auth.middleware.js';
 import { validarId } from '../middlewares/id.middleware.js';
-import { autorizarRol, ROLES_PRODUCCION } from '../middlewares/rol.middleware.js';
+import {
+  autorizarRol,
+  ROLES_PRODUCCION
+} from '../middlewares/rol.middleware.js';
 import {
   validarActualizacionServicio,
   validarCambioServicio,
@@ -14,11 +17,8 @@ const router = Router();
 
 router.use(requireAuth);
 
-// Cualquier rol autenticado puede consultar servicios.
-router.get('/', servicioController.listar);
-router.get('/:id', validarId, servicioController.obtener);
 
-// Administración y Comercial (usuario) y admin pueden crear y editar.
+// Producción y Comercial (usuario) y Administración (admin) pueden crear y actualizar servicios.
 router.post(
   '/',
   autorizarRol(ROLES_PRODUCCION),
