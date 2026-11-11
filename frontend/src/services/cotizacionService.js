@@ -9,3 +9,8 @@ export function listar({ estado = '', solicitudId = '' } = {}) {
 }
 
 export const obtener = (id) => api.get(`/cotizaciones/${id}`);
+
+// Muestra el detalle y el total sin guardar
+export const calcular = (datos) => api.post('/cotizaciones/calcular', datos);
+
+export const crear = (datos) => api.post('/cotizaciones', datos);
