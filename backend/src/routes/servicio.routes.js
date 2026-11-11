@@ -11,10 +11,21 @@ import {
 } from '../middlewares/servicio.middleware.js';
 
 const router = Router();
+
 router.use(requireAuth);
+
+// Cualquier rol autenticado puede consultar servicios.
 router.get('/', servicioController.listar);
 router.get('/:id', validarId, servicioController.obtener);
-router.post('/', autorizarRol(ROLES_PRODUCCION), validarServicio, servicioController.crear);
+
+// Administración y Comercial (usuario) y admin pueden crear y editar.
+router.post(
+  '/',
+  autorizarRol(ROLES_PRODUCCION),
+  validarServicio,
+  servicioController.crear
+);
+
 router.post(
   '/:id/cambios',
   autorizarRol(ROLES_PRODUCCION),
@@ -22,6 +33,7 @@ router.post(
   validarCambioServicio,
   cambioServicioController.crear
 );
+
 router.put(
   '/:id',
   autorizarRol(ROLES_PRODUCCION),

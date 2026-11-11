@@ -2,6 +2,7 @@
 export const ROLES_PRODUCCION = ['usuario', 'admin'];
 export const ROLES_GERENCIA = ['manager', 'admin'];
 export const ROLES_ADMIN = ['admin'];
+export const ROLES_LECTURA_SERVICIOS = ['usuario', 'manager', 'admin'];
 
 // Va después de requireAuth y deja pasar solo a los roles indicados
 export function autorizarRol(roles) {
