@@ -108,7 +108,10 @@ export async function calcular({ solicitudId, servicios: servicioIds }) {
   };
 }
 
-// El detalle se arma con la versión de precio guardada y el horario actual de la solicitud
+// El detalle se arma con la versión de precio guardada y el horario actual de la solicitud.
+// Pendiente: las horas no se guardan en la cotización. Si a futuro se modifica el horario de la
+// solicitud, hay que recalcular las horas y el total de su cotización, y esa cotización tendrá que
+// volver a confirmarse (pasar otra vez por su revisión/aprobación) antes de seguir el proceso.
 function aRespuesta(cotizacion) {
   const { solicitud, detalles, ...datos } = cotizacion;
   const horaInicio = textoHora(solicitud.horaInicio);
