@@ -1,6 +1,27 @@
 import { prisma } from '../config/prisma.js';
 import { INCLUIR_SERVICIO } from './servicio.service.js';
 import * as solicitudService from './solicitud.service.js';
+import { textoFecha, textoHora } from './solicitud.service.js';
+
+// Con estos estados la cotización terminó sin concretarse y se puede cotizar de nuevo la solicitud
+const ESTADOS_CERRADOS = ['rechazada', 'sin_respuesta'];
+
+const INCLUIR_COTIZACION = {
+  solicitud: {
+    select: {
+      id: true,
+      tipoEvento: true,
+      fecha: true,
+      horaInicio: true,
+      horaFin: true,
+      cliente: { select: { id: true, nombre: true } }
+    }
+  },
+  detalles: {
+    include: { servicio: { select: { id: true, nombre: true } }, versionServicio: true },
+    orderBy: { id: 'asc' }
+  }
+};
 
 // Horas del evento a partir de su horario ('HH:MM'); si sobran 30 minutos o más se suma una hora.
 // Ojo: un evento de menos de 30 minutos da 0 horas, por lo que sus servicios por hora quedan en $0.
@@ -10,6 +31,20 @@ export function horasDelEvento(horaInicio, horaFin) {
   const [horaF, minutoF] = horaFin.split(':').map(Number);
   const minutos = horaF * 60 + minutoF - (horaI * 60 + minutoI);
   return Math.floor(minutos / 60) + (minutos % 60 >= 30 ? 1 : 0);
+}
+
+// Una línea del detalle: fijo = precio; por hora = precio × horas del evento
+function lineaDetalle(servicio, version, horasEvento) {
+  const porHora = version.tipoPrecio === 'por_hora';
+  return {
+    servicioId: servicio.id,
+    nombre: servicio.nombre,
+    versionServicioId: version.id,
+    tipoPrecio: version.tipoPrecio,
+    precio: version.precio,
+    ...(porHora && { horas: horasEvento }),
+    subtotal: porHora ? version.precio * horasEvento : version.precio
+  };
 }
 
 // Solo se cotizan solicitudes con todos sus datos y que aún no son eventos confirmados
@@ -56,20 +91,7 @@ export async function calcular({ solicitudId, servicios: servicioIds }) {
 
   const horasEvento = horasDelEvento(solicitud.horaInicio, solicitud.horaFin);
   const servicios = await obtenerServiciosCotizables(servicioIds);
-
-  const detalles = servicios.map((servicio) => {
-    const [version] = servicio.versiones;
-    const porHora = version.tipoPrecio === 'por_hora';
-    return {
-      servicioId: servicio.id,
-      nombre: servicio.nombre,
-      versionServicioId: version.id,
-      tipoPrecio: version.tipoPrecio,
-      precio: version.precio,
-      ...(porHora && { horas: horasEvento }),
-      subtotal: porHora ? version.precio * horasEvento : version.precio
-    };
-  });
+  const detalles = servicios.map((servicio) => lineaDetalle(servicio, servicio.versiones[0], horasEvento));
 
   return {
     solicitud: {
@@ -84,4 +106,73 @@ export async function calcular({ solicitudId, servicios: servicioIds }) {
     detalles,
     total: detalles.reduce((total, detalle) => total + detalle.subtotal, 0)
   };
+}
+
+// El detalle se arma con la versión de precio guardada y el horario actual de la solicitud
+function aRespuesta(cotizacion) {
+  const { solicitud, detalles, ...datos } = cotizacion;
+  const horaInicio = textoHora(solicitud.horaInicio);
+  const horaFin = textoHora(solicitud.horaFin);
+  const horasEvento = horaInicio && horaFin ? horasDelEvento(horaInicio, horaFin) : 0;
+  return {
+    ...datos,
+    solicitud: {
+      id: solicitud.id,
+      clienteId: solicitud.cliente.id,
+      cliente: solicitud.cliente.nombre,
+      tipoEvento: solicitud.tipoEvento,
+      fecha: textoFecha(solicitud.fecha),
+      horaInicio,
+      horaFin,
+      horasEvento
+    },
+    detalles: detalles.map(({ servicio, versionServicio }) => lineaDetalle(servicio, versionServicio, horasEvento))
+  };
+}
+
+export async function listar({ estado, solicitudId } = {}) {
+  const cotizaciones = await prisma.cotizacion.findMany({
+    where: { estado, solicitudId },
+    include: INCLUIR_COTIZACION,
+    orderBy: { createdAt: 'desc' }
+  });
+  return cotizaciones.map(aRespuesta);
+}
+
+export async function obtenerPorId(id) {
+  const cotizacion = await prisma.cotizacion.findUnique({ where: { id }, include: INCLUIR_COTIZACION });
+  if (!cotizacion) throw Object.assign(new Error('Cotización no encontrada.'), { status: 404 });
+  return aRespuesta(cotizacion);
+}
+
+// Recalcula en el servidor y guarda la cotización pendiente de revisión por Gerencia.
+// Una solicitud no puede tener dos cotizaciones activas (solo se recotiza tras rechazo o sin respuesta).
+export async function crear(datos) {
+  const calculo = await calcular(datos);
+
+  const creada = await prisma.$transaction(async (transaction) => {
+    const activa = await transaction.cotizacion.findFirst({
+      where: { solicitudId: datos.solicitudId, estado: { notIn: ESTADOS_CERRADOS } },
+      select: { id: true, estado: true }
+    });
+    if (activa) {
+      throw Object.assign(new Error('La solicitud ya tiene una cotización activa.'), {
+        status: 409,
+        detalles: { cotizacionActiva: activa }
+      });
+    }
+
+    return transaction.cotizacion.create({
+      data: {
+        solicitudId: datos.solicitudId,
+        total: calculo.total,
+        detalles: {
+          create: calculo.detalles.map(({ servicioId, versionServicioId }) => ({ servicioId, versionServicioId }))
+        }
+      },
+      include: INCLUIR_COTIZACION
+    });
+  });
+
+  return aRespuesta(creada);
 }
