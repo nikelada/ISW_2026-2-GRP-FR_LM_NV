@@ -172,7 +172,8 @@ function DetalleCotizacion({ cotizacion: c, user }) {
         ['Solicitud', `#${solicitud.id} · ${solicitud.tipoEvento || 'Sin tipo de evento'}`],
         ['Fecha', solicitud.fecha ? formatearFecha(solicitud.fecha) : '—'],
         ['Horario', formatearHorario(solicitud) || '—'],
-        ['Horas del evento', `${solicitud.horasEvento} h`],
+        // horas guardadas al cotizar; pueden diferir del horario actual si la solicitud se editó
+        ['Horas cotizadas', `${solicitud.horasEvento} h`],
         ['Registrada', new Date(c.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })]
       ]} />
       <DetalleCalculo detalles={c.detalles} total={c.total} />
