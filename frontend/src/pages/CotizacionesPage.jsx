@@ -67,16 +67,23 @@ const columnas = [
 export default function CotizacionesPage({ user, params }) {
   const puedeCrear = esProduccion(user);
   const [filtro, setFiltro] = useState('');
+  const [busqueda, setBusqueda] = useState('');
   const [creando, setCreando] = useState(false);
   const [seleccionadaId, setSeleccionadaId] = useState(Number(params.get('id')) || null);
   const { datos: cotizaciones, cargando, error, recargar } = useFetch(
     useCallback(() => cotizacionService.listar({ estado: filtro }), [filtro])
   );
   const seleccionada = cotizaciones.find((c) => c.id === seleccionadaId) || null;
+  // Igual que en Solicitudes: busca por cliente o tipo de evento sobre lo ya cargado
+  const texto = busqueda.trim().toLowerCase();
+  const visibles = texto
+    ? cotizaciones.filter((c) => `${c.solicitud.cliente} ${c.solicitud.tipoEvento || ''}`.toLowerCase().includes(texto))
+    : cotizaciones;
 
   function verCotizacion(id) {
     setCreando(false);
     setFiltro('');
+    setBusqueda('');
     setSeleccionadaId(id);
   }
 
@@ -97,6 +104,7 @@ export default function CotizacionesPage({ user, params }) {
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
+            <input type="search" placeholder="Buscar por cliente o tipo de evento" aria-label="Buscar cotizaciones" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
             <select className="w-auto" aria-label="Filtrar por estado" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
               <option value="">Todos los estados</option>
               {Object.entries(ESTADOS).map(([valor, { texto }]) => (
@@ -110,8 +118,14 @@ export default function CotizacionesPage({ user, params }) {
           ) : (
             <DataTable
               columnas={columnas}
-              datos={cotizaciones}
-              vacio={filtro ? 'No hay cotizaciones con este estado.' : 'Todavía no hay cotizaciones registradas.'}
+              datos={visibles}
+              vacio={
+                texto
+                  ? 'No hay cotizaciones que coincidan con la búsqueda.'
+                  : filtro
+                    ? 'No hay cotizaciones con este estado.'
+                    : 'Todavía no hay cotizaciones registradas.'
+              }
               seleccionadoId={seleccionadaId}
               onSeleccionar={(c) => { setCreando(false); setSeleccionadaId(c.id); }}
             />
