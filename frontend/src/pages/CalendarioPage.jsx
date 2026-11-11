@@ -11,6 +11,7 @@ import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
 import * as calendarioService from '../services/calendarioService.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
+import { esProduccion } from '../utils/roles.js';
 
 const DIAS = ['Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb', 'Dom'];
 
@@ -38,7 +39,7 @@ function diasDelMes(mes) {
 }
 
 // Calendario con los eventos y la consulta de disponibilidad
-export default function CalendarioPage() {
+export default function CalendarioPage({ user }) {
   const hoy = aIso(new Date());
   const [seleccionado, setSeleccionado] = useState(hoy);
   const [mes, setMes] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
@@ -153,7 +154,8 @@ export default function CalendarioPage() {
                     <small className="mb-1 mt-0.5 block text-stone-500">{evento.tipoEvento ? `${evento.tipoEvento} · ` : ''}{evento.lugar || 'Sin lugar'}{evento.cantidadPersonas ? ` · ${evento.cantidadPersonas} personas` : ''}</small>
                     <div><EstadoBadge estado={evento.estado} fechaHabilitada={evento.fechaHabilitada} /></div>
                   </div>
-                  <a className="text-sm font-semibold text-teal-700 hover:underline" href={`#/solicitudes?id=${evento.id}`}>Ver</a>
+                  {/* Gerencia no tiene la sección Solicitudes */}
+                  {esProduccion(user) && <a className="text-sm font-semibold text-teal-700 hover:underline" href={`#/solicitudes?id=${evento.id}`}>Ver</a>}
                 </li>
               ))}
             </ul>
