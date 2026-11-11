@@ -121,7 +121,7 @@ export default function CotizacionesPage({ user, params }) {
           {creando ? (
             <NuevaCotizacion onCancelar={() => setCreando(false)} onGuardada={alGuardar} onVerCotizacion={verCotizacion} />
           ) : seleccionada ? (
-            <DetalleCotizacion key={seleccionada.id} cotizacion={seleccionada} />
+            <DetalleCotizacion key={seleccionada.id} cotizacion={seleccionada} user={user} />
           ) : (
             <>
               <Antetitulo>Detalle</Antetitulo>
@@ -161,7 +161,7 @@ function DetalleCalculo({ detalles, total }) {
   );
 }
 
-function DetalleCotizacion({ cotizacion: c }) {
+function DetalleCotizacion({ cotizacion: c, user }) {
   const { solicitud } = c;
   return (
     <>
@@ -176,7 +176,10 @@ function DetalleCotizacion({ cotizacion: c }) {
         ['Registrada', new Date(c.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })]
       ]} />
       <DetalleCalculo detalles={c.detalles} total={c.total} />
-      <a className="mt-5 inline-block text-sm font-semibold text-teal-700 hover:underline" href={`#/solicitudes?id=${solicitud.id}`}>Abrir en Solicitudes →</a>
+      {/* Gerencia no tiene la sección Solicitudes */}
+      {esProduccion(user) && (
+        <a className="mt-5 inline-block text-sm font-semibold text-teal-700 hover:underline" href={`#/solicitudes?id=${solicitud.id}`}>Abrir en Solicitudes →</a>
+      )}
     </>
   );
 }
