@@ -17,8 +17,9 @@ const router = Router();
 
 router.use(requireAuth);
 
+router.get('/', servicioController.listar);
+router.get('/:id', validarId, servicioController.obtener);
 
-// Producción y Comercial (usuario) y Administración (admin) pueden crear y actualizar servicios.
 router.post(
   '/',
   autorizarRol(ROLES_PRODUCCION),
