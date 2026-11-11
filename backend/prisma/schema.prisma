@@ -254,8 +254,6 @@ model DetalleCotizacion {
   servicio          Servicio        @relation(fields: [servicioId], references: [id], onDelete: Restrict)
   versionServicioId Int
   versionServicio   VersionServicio @relation(fields: [versionServicioId], references: [id], onDelete: Restrict)
-  // unidades, o horas si el precio es por hora
-  cantidad          Int
 
   @@unique([cotizacionId, servicioId])
   @@index([servicioId])
