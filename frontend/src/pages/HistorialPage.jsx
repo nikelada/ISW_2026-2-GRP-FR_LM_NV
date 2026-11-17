@@ -62,11 +62,20 @@ export default function HistorialPage({ user, params }) {
   const [busqueda, setBusqueda] = useState('');
   const [q, setQ] = useState('');
   const { datos: encontrados } = useFetch(useCallback(() => (puedeConsultar && q ? clienteService.listar(q) : Promise.resolve([])), [puedeConsultar, q]));
-  const [clienteId, setClienteId] = useState(params.get('cliente') || '');
+  const [cliente, setCliente] = useState(null);
+  const rutInicial = params.get('cliente');
   const { datos: historial, cargando, error } = useFetch(
-    useCallback(() => (clienteId ? clienteService.historial(clienteId) : Promise.resolve(null)), [clienteId]),
+    useCallback(() => (cliente ? clienteService.historial(cliente.id) : Promise.resolve(null)), [cliente]),
     null
   );
+
+  // Si se llega desde Clientes, el cliente viene por su RUT
+  useEffect(() => {
+    if (!puedeConsultar || !rutInicial) return;
+    clienteService.listar(rutInicial)
+      .then((lista) => setCliente(lista.find((c) => c.rut === rutInicial) || null))
+      .catch(() => setCliente(null));
+  }, [puedeConsultar, rutInicial]);
   const [seleccionadoId, setSeleccionadoId] = useState(null);
   const [filtro, setFiltro] = useState('');
   const registros = historial?.registros || [];
@@ -85,8 +94,8 @@ export default function HistorialPage({ user, params }) {
     return () => clearTimeout(timer);
   }, [busqueda]);
 
-  function elegirCliente(cliente) {
-    setClienteId(String(cliente.id));
+  function elegirCliente(elegido) {
+    setCliente(elegido);
     setSeleccionadoId(null);
     setBusqueda('');
   }
@@ -132,7 +141,7 @@ export default function HistorialPage({ user, params }) {
             </p>
           )}
           {error && <Aviso tipo="error" className="m-3.5">{error}</Aviso>}
-          {!clienteId ? (
+          {!cliente ? (
             <Vacio>Busca un cliente para ver su historial.</Vacio>
           ) : cargando && !historial ? (
             <Vacio>Cargando…</Vacio>

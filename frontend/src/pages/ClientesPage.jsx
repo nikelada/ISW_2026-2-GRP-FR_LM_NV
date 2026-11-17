@@ -88,8 +88,9 @@ export default function ClientesPage({ user, onNavegar }) {
       render: (c) => (
         <span className="inline-flex gap-3.5">
           <Boton variante="enlace" onClick={() => editar(c)}>Editar</Boton>
-          <Boton variante="enlace" onClick={() => onNavegar(`solicitudes?nueva=1&cliente=${c.id}`)}>Nueva solicitud</Boton>
-          <Boton variante="enlace" onClick={() => onNavegar(`historial?cliente=${c.id}`)}>Historial</Boton>
+          {/* Se pasa el RUT, no el id */}
+          <Boton variante="enlace" onClick={() => onNavegar(`solicitudes?nueva=1${c.rut ? `&cliente=${c.rut}` : ''}`)}>Nueva solicitud</Boton>
+          <Boton variante="enlace" onClick={() => onNavegar(c.rut ? `historial?cliente=${c.rut}` : 'historial')}>Historial</Boton>
         </span>
       )
     });

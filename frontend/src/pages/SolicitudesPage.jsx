@@ -79,7 +79,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
 
   const [seleccionada, setSeleccionada] = useState(null);
   const [modo, setModo] = useState(puedeEditar && params.get('nueva') === '1' ? 'nueva' : 'detalle');
-  const [form, setForm] = useState({ ...VACIO, clienteId: params.get('cliente') || '' });
+  const [form, setForm] = useState(VACIO);
   const [errores, setErrores] = useState({});
   const [aviso, setAviso] = useState(null);
   const [guardando, setGuardando] = useState(false);
@@ -88,6 +88,13 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
   const [servicioProcesando, setServicioProcesando] = useState('');
   const [resultado, setResultado] = useState(null);
   const idInicial = Number(params.get('id')) || null;
+  const rutCliente = params.get('cliente');
+
+  // Si se llega desde Clientes, el cliente viene por su RUT
+  useEffect(() => {
+    const cliente = rutCliente && clientes.find((c) => c.rut === rutCliente);
+    if (cliente) setForm((actual) => (actual.clienteId ? actual : { ...actual, clienteId: String(cliente.id) }));
+  }, [clientes, rutCliente]);
 
   // Actualiza el detalle cuando se recarga la lista y abre la solicitud que venga en la URL
   // (por ejemplo cuando se llega desde el calendario)
