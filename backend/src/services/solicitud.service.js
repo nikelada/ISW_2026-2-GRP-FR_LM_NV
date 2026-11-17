@@ -2,6 +2,7 @@ import { prisma } from '../config/prisma.js';
 import { fechaActual } from '../utils/fecha.js';
 import * as clienteService from './cliente.service.js';
 import { aRespuesta as aRespuestaServicio, INCLUIR_SERVICIO } from './servicio.service.js';
+import { asegurarTipoEvento } from './tipoEvento.service.js';
 
 // Información obligatoria para que la solicitud quede registrada.
 const CAMPOS_OBLIGATORIOS = [
@@ -129,6 +130,7 @@ export async function obtenerPorId(id) {
 export async function crear(datos) {
   asegurarFechaNoPasada(datos.fecha);
   await asegurarClienteRegistrado(datos.clienteId);
+  await asegurarTipoEvento(datos.tipoEvento);
   const creada = await prisma.solicitud.create({ data: aDatos(datos), include: INCLUIR_SOLICITUD });
   return aRespuesta(creada);
 }
@@ -142,6 +144,7 @@ export async function actualizar(id, datos) {
   // Solo si cambió, para poder seguir completando una solicitud antigua
   if (datos.fecha !== actual.fecha) asegurarFechaNoPasada(datos.fecha);
   if (datos.clienteId !== actual.clienteId) await asegurarClienteRegistrado(datos.clienteId);
+  if (datos.tipoEvento !== actual.tipoEvento) await asegurarTipoEvento(datos.tipoEvento);
 
   const data = aDatos(datos, actual.servicios);
   // Si cambió la fecha u hora hay que volver a revisar la disponibilidad

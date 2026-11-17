@@ -3,6 +3,7 @@ import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoBadge from '../components/EstadoBadge.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
+import SelectorTipoEvento from '../components/SelectorTipoEvento.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Boton from '../components/ui/Boton.jsx';
@@ -273,7 +274,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
                     {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.rut ? ` · ${c.rut}` : ''}</option>)}
                   </select>
                 </Campo>
-                <Campo etiqueta="Tipo de evento" error={errores.tipoEvento}><input type="text" maxLength={100} placeholder="Ej.: matrimonio, seminario" {...campo('tipoEvento')} /></Campo>
+                <SelectorTipoEvento etiqueta="Tipo de evento" error={errores.tipoEvento} value={form.tipoEvento} onChange={(tipoEvento) => setForm((actual) => ({ ...actual, tipoEvento }))} />
                 <Campo etiqueta="Fecha" error={errores.fecha}><input type="date" {...campo('fecha')} /></Campo>
                 <div className="grid grid-cols-2 gap-3">
                   <Campo etiqueta="Hora de inicio" error={errores.horaInicio}><input type="time" {...campo('horaInicio')} /></Campo>

@@ -188,6 +188,7 @@ async function main() {
   let solicitudesCreadas = 0;
   let solicitudesOmitidas = 0;
   let cambiosCreados = 0;
+  let tiposEventoCreados = 0;
 
   const datosClientes = [
     { rut: '16234871-K', nombre: 'Camila Rojas', telefono: '+56 9 8123 4567', correo: 'camila.rojas@example.com' },
@@ -248,6 +249,16 @@ async function main() {
     const resultado = await obtenerOCrearServicio(datos);
     servicios.set(datos.clave, resultado.registro);
     if (resultado.creado) serviciosCreados += 1;
+  }
+
+  // Van antes de las solicitudes que los usan
+  const tiposEvento = ['Matrimonio', 'Seminario corporativo', 'Cumpleaños', 'Fiesta de graduación', 'Aniversario de empresa', 'Lanzamiento de producto'];
+  for (const nombre of tiposEvento) {
+    const existente = await prisma.tipoEvento.findUnique({ where: { nombre } });
+    if (!existente) {
+      await prisma.tipoEvento.create({ data: { nombre } });
+      tiposEventoCreados += 1;
+    }
   }
 
   const firmasExistentes = await obtenerFirmasSolicitudes();
@@ -346,7 +357,7 @@ async function main() {
   }
 
   console.log(
-    `Seed completado. Clientes nuevos: ${clientesCreados}; tipos nuevos: ${tiposCreados}; ` +
+    `Seed completado. Clientes nuevos: ${clientesCreados}; tipos de evento nuevos: ${tiposEventoCreados}; tipos nuevos: ${tiposCreados}; ` +
       `servicios nuevos: ${serviciosCreados}; solicitudes nuevas: ${solicitudesCreadas}; ` +
       `cambios nuevos: ${cambiosCreados}; solicitudes omitidas por duplicado: ${solicitudesOmitidas}.`
   );

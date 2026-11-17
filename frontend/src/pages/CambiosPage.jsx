@@ -3,6 +3,7 @@ import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoCambio, { ESTADOS_CAMBIO } from '../components/EstadoCambio.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
+import SelectorTipoEvento from '../components/SelectorTipoEvento.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Boton from '../components/ui/Boton.jsx';
@@ -190,7 +191,10 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
                   <input type="checkbox" name={`cambiar-${campo}`} checked={!!seleccion[campo]} onChange={(e) => setSeleccion({ ...seleccion, [campo]: e.target.checked })} />
                   <span>{etiqueta}</span>
                 </label>
-                {seleccion[campo] && (
+                {seleccion[campo] && tipo === 'lista' && (
+                  <SelectorTipoEvento name={campo} error={errores[campo]} value={valores[campo]} onChange={(valor) => setValores((actual) => ({ ...actual, [campo]: valor }))} />
+                )}
+                {seleccion[campo] && tipo !== 'lista' && (
                   <Campo error={errores[campo]}>
                     {tipo === 'textarea'
                       ? <textarea name={campo} value={valores[campo]} onChange={(e) => setValores({ ...valores, [campo]: e.target.value })} />
