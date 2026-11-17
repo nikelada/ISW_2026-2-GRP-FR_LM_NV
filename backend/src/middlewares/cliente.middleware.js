@@ -10,6 +10,20 @@ function normalizarRut(texto) {
   return limpio.length > 1 ? `${limpio.slice(0, -1)}-${limpio.slice(-1)}` : limpio;
 }
 
+// Dígito verificador con módulo 11
+function digitoVerificador(numero) {
+  let suma = 0;
+  let factor = 2;
+  for (const digito of [...numero].reverse()) {
+    suma += Number(digito) * factor;
+    factor = factor === 7 ? 2 : factor + 1;
+  }
+  const resultado = 11 - (suma % 11);
+  if (resultado === 11) return '0';
+  if (resultado === 10) return 'K';
+  return String(resultado);
+}
+
 // RUT, nombre, teléfono y correo son obligatorios. Deja el body limpio para el controlador
 export function validarCliente(req, res, next) {
   const rut = normalizarRut(req.body.rut);
@@ -20,6 +34,7 @@ export function validarCliente(req, res, next) {
   const errores = {};
   if (!rut) errores.rut = 'El RUT es obligatorio.';
   else if (!RUT_REGEX.test(rut)) errores.rut = 'El RUT no tiene un formato válido.';
+  else if (digitoVerificador(rut.slice(0, -2)) !== rut.slice(-1)) errores.rut = 'El RUT no es válido: el dígito verificador no corresponde.';
   if (!nombre) errores.nombre = 'El nombre es obligatorio.';
   else if (nombre.length < 2) errores.nombre = 'El nombre debe tener al menos 2 caracteres.';
   else if (nombre.length > 150) errores.nombre = 'El nombre no puede superar 150 caracteres.';
