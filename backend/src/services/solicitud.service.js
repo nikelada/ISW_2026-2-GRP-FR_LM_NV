@@ -35,12 +35,12 @@ export const aHora = (texto) => (texto ? new Date(`1970-01-01T${texto}:00Z`) : n
 export const textoFecha = (valor) => (valor ? valor.toISOString().slice(0, 10) : null);
 export const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
 
-// No se aceptan fechas anteriores a hoy
+// Solo se aceptan fechas desde mañana
 export function asegurarFechaNoPasada(fecha) {
-  if (fecha && fecha < textoFecha(fechaActual())) {
-    throw Object.assign(new Error('La fecha ya pasó; elige una fecha desde hoy en adelante.'), {
+  if (fecha && fecha <= textoFecha(fechaActual())) {
+    throw Object.assign(new Error('La fecha del evento tiene que ser desde mañana en adelante.'), {
       status: 400,
-      detalles: { errores: { fecha: 'La fecha no puede ser anterior a hoy.' } }
+      detalles: { errores: { fecha: 'La fecha no puede ser hoy ni un día anterior.' } }
     });
   }
 }

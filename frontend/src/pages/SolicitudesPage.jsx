@@ -18,7 +18,7 @@ import * as clienteService from '../services/clienteService.js';
 import * as solicitudService from '../services/solicitudService.js';
 import * as servicioService from '../services/servicioService.js';
 import { etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
-import { formatearFecha, formatearHorario } from '../utils/fechas.js';
+import { fechaMinima, formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
 const VACIO = { clienteId: '', tipoEvento: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '', requerimientosTecnicos: '' };
@@ -282,7 +282,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
                   </select>
                 </Campo>
                 <SelectorTipoEvento etiqueta="Tipo de evento" error={errores.tipoEvento} value={form.tipoEvento} onChange={(tipoEvento) => setForm((actual) => ({ ...actual, tipoEvento }))} />
-                <Campo etiqueta="Fecha" error={errores.fecha}><input type="date" {...campo('fecha')} /></Campo>
+                <Campo etiqueta="Fecha" error={errores.fecha}><input type="date" min={fechaMinima()} {...campo('fecha')} /></Campo>
                 <div className="grid grid-cols-2 gap-3">
                   <Campo etiqueta="Hora de inicio" error={errores.horaInicio}><input type="time" {...campo('horaInicio')} /></Campo>
                   <Campo etiqueta="Hora de término" error={errores.horaFin}><input type="time" {...campo('horaFin')} /></Campo>

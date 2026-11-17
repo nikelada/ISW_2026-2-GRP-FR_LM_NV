@@ -15,7 +15,7 @@ import { useFetch } from '../hooks/useFetch.js';
 import * as cambioService from '../services/cambioService.js';
 import * as solicitudService from '../services/solicitudService.js';
 import { CAMPOS_EVENTO, etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
-import { formatearFecha, formatearHorario } from '../utils/fechas.js';
+import { fechaMinima, formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esGerencia, esProduccion } from '../utils/roles.js';
 
 // Marcar un factor significa que ya se revisó, no que esté todo bien
@@ -198,7 +198,7 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
                   <Campo error={errores[campo]}>
                     {tipo === 'textarea'
                       ? <textarea name={campo} value={valores[campo]} onChange={(e) => setValores({ ...valores, [campo]: e.target.value })} />
-                      : <input type={tipo} name={campo} min={tipo === 'number' ? 1 : undefined} value={valores[campo]} onChange={(e) => setValores({ ...valores, [campo]: e.target.value })} />}
+                      : <input type={tipo} name={campo} min={tipo === 'number' ? 1 : tipo === 'date' ? fechaMinima() : undefined} value={valores[campo]} onChange={(e) => setValores({ ...valores, [campo]: e.target.value })} />}
                   </Campo>
                 )}
               </div>
