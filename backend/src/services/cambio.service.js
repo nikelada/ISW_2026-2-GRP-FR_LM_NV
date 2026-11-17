@@ -46,13 +46,15 @@ export async function listar({ estado, solicitudId } = {}) {
   if (estado && !ESTADOS.includes(estado)) throw httpError(400, 'Estado de cambio inválido.');
   const cambios = await prisma.solicitudCambio.findMany({
     where: { estado: estado || undefined, solicitudId: solicitudId || undefined },
+    include: { historial: true },
     orderBy: { createdAt: 'desc' }
   });
   return Promise.all(cambios.map(conDetalle));
 }
 
+// Con su historial, para mostrar el valor que tenía antes de aplicarse
 export async function obtenerPorId(id) {
-  const cambio = await prisma.solicitudCambio.findUnique({ where: { id } });
+  const cambio = await prisma.solicitudCambio.findUnique({ where: { id }, include: { historial: true } });
   if (!cambio) throw httpError(404, 'Cambio no encontrado.');
   return conDetalle(cambio);
 }
@@ -131,14 +133,4 @@ export async function aplicar(id, usuario) {
     prisma.solicitudCambio.update({ where: { id }, data: { aplicadoPor: usuario.name, aplicadoEn: new Date() } })
   ]);
   return obtenerPorId(id);
-}
-
-// Historial de lo que se le ha cambiado a un evento
-export async function historialDeEvento(solicitudId) {
-  await obtenerEvento(solicitudId);
-  return prisma.historialEvento.findMany({
-    where: { solicitudId },
-    include: { cambio: { select: { id: true, codigo: true, motivo: true, revisadoPor: true, revisadoEn: true } } },
-    orderBy: { createdAt: 'desc' }
-  });
 }

@@ -98,7 +98,7 @@ export default function ClientesPage({ user, onNavegar }) {
 
   return (
     <>
-      <EncabezadoPagina antetitulo="Gestión" titulo="Clientes" descripcion="Clientes registrados y disponibles para asociarlos a nuevas solicitudes." />
+      <EncabezadoPagina antetitulo="Gestión" titulo="Clientes" descripcion="Aquí se registran y actualizan los clientes. Desde cada cliente se puede crear una solicitud o ver su historial." />
       <div className={`grid grid-cols-1 items-start gap-4 ${puedeEditar ? 'lg:grid-cols-[minmax(0,1fr)_380px]' : ''}`}>
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">

@@ -1,5 +1,4 @@
 import { Router } from 'express';
-import * as cambioController from '../controllers/cambio.controller.js';
 import * as solicitudController from '../controllers/solicitud.controller.js';
 import { requireAuth } from '../middlewares/auth.middleware.js';
 import { autorizarRol, ROLES_PRODUCCION } from '../middlewares/rol.middleware.js';
@@ -10,7 +9,6 @@ const router = Router();
 router.use(requireAuth);
 router.get('/', solicitudController.listar);
 router.get('/:id', validarId, solicitudController.obtener);
-router.get('/:id/historial', validarId, cambioController.historial);
 router.post('/', autorizarRol(ROLES_PRODUCCION), validarSolicitud, solicitudController.crear);
 router.post(
   '/:id/servicios',

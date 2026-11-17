@@ -101,7 +101,7 @@ export default function CambiosPage({ user, params }) {
 
   return (
     <>
-      <EncabezadoPagina antetitulo="Eventos confirmados" titulo="Cambios solicitados" descripcion="Cambios pedidos por los clientes: Gerencia los aprueba o rechaza y Producción y Comercial aplica solo lo aprobado.">
+      <EncabezadoPagina antetitulo="Eventos confirmados" titulo="Cambios solicitados" descripcion="Cambios que piden los clientes a eventos ya confirmados: Producción y Comercial los registra, Gerencia los aprueba o rechaza y después se aplica solo lo aprobado. Si la solicitud aún no está confirmada, se edita en Solicitudes.">
         {produccion && (
           <Boton onClick={() => { setNuevo(true); setSeleccionadoId(null); setAviso(null); }}>
             <span>Registrar cambio</span><span aria-hidden="true">+</span>
@@ -182,6 +182,7 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
             {eventos.map((e) => <option key={e.id} value={e.id}>{e.cliente.nombre} · {formatearFecha(e.fecha)} · {formatearHorario(e)}</option>)}
           </select>
         </Campo>
+        <p className="text-xs text-stone-500">Solo aparecen eventos confirmados. Las solicitudes sin confirmar se editan en Solicitudes.</p>
         {evento && (
           <>
             <p className="text-xs text-stone-500">Marca los datos que el cliente quiere cambiar e indica el nuevo valor.</p>
@@ -223,6 +224,8 @@ function DetalleCambio({ cambio, aviso, gerencia, produccion, onTerminar }) {
   const [resultado, setResultado] = useState(null);
   const todosRevisados = FACTORES.every(({ clave }) => factores[clave]);
   const { evento } = cambio;
+  // Lo que tenía el evento antes de aplicar el cambio
+  const antes = Object.fromEntries((cambio.historial || []).map((h) => [h.campo, h.valorAnterior]));
 
   async function revisar(decision) {
     setError('');
@@ -261,7 +264,7 @@ function DetalleCambio({ cambio, aviso, gerencia, produccion, onTerminar }) {
         <thead className="text-[11px] uppercase tracking-wide text-stone-500">
           <tr>
             <th className={celda}>Dato</th>
-            {!cambio.aplicadoEn && <th className={celda}>Actual</th>}
+            <th className={celda}>{cambio.aplicadoEn ? 'Antes' : 'Actual'}</th>
             <th className={celda}>{cambio.aplicadoEn ? 'Aplicado' : cambio.estado === 'pendiente' ? 'Propuesto' : 'Solicitado'}</th>
           </tr>
         </thead>
@@ -269,7 +272,7 @@ function DetalleCambio({ cambio, aviso, gerencia, produccion, onTerminar }) {
           {Object.entries(cambio.cambios).map(([campo, valor]) => (
             <tr key={campo}>
               <td className={celda}>{etiquetaCampo(campo)}</td>
-              {!cambio.aplicadoEn && <td className={celda}>{formatearValor(campo, evento[campo])}</td>}
+              <td className={celda}>{formatearValor(campo, cambio.aplicadoEn ? antes[campo] : evento[campo])}</td>
               <td className={`${celda} font-semibold`}>{formatearValor(campo, valor)}</td>
             </tr>
           ))}

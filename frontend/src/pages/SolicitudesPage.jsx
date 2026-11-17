@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoBadge from '../components/EstadoBadge.jsx';
+import ListaCambios from '../components/ListaCambios.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
 import SelectorTipoEvento from '../components/SelectorTipoEvento.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
@@ -17,7 +18,6 @@ import * as cambioService from '../services/cambioService.js';
 import * as clienteService from '../services/clienteService.js';
 import * as solicitudService from '../services/solicitudService.js';
 import * as servicioService from '../services/servicioService.js';
-import { etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
 import { fechaMinima, formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
@@ -224,7 +224,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
 
   return (
     <>
-      <EncabezadoPagina antetitulo="Gestión" titulo="Solicitudes de eventos" descripcion="Solicitudes de eventos asociadas a clientes registrados y su estado.">
+      <EncabezadoPagina antetitulo="Gestión" titulo="Solicitudes de eventos" descripcion="Aquí se registran las solicitudes y se editan mientras el evento no esté confirmado. Después de confirmado, los cambios se registran en Cambios.">
         {puedeEditar && <Boton onClick={nueva}><span>Nueva solicitud</span><span aria-hidden="true">+</span></Boton>}
       </EncabezadoPagina>
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
@@ -354,8 +354,8 @@ function DetalleSolicitud({
       <div className="mb-4" data-estado-detalle><EstadoBadge estado={s.estado} fechaHabilitada={s.fechaHabilitada} /></div>
       {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
       {confirmada ? (
-        <Aviso tipo="success" titulo="Evento con fecha confirmada">
-          <p>Sus datos solo se modifican mediante un cambio aprobado por Gerencia.</p>
+        <Aviso tipo="success" titulo="Evento confirmado: ya no se edita">
+          <p>Cualquier cambio que pida el cliente se registra en Cambios y lo aprueba Gerencia.</p>
         </Aviso>
       ) : s.faltantes.length ? (
         <Aviso tipo="warning" titulo="Solicitud pendiente: falta información obligatoria">
@@ -455,37 +455,26 @@ function DetalleSolicitud({
         {puedeEditar && !confirmada && (
           <Boton onClick={onEditar}><span>{s.faltantes.length ? 'Completar información' : 'Editar solicitud'}</span><span aria-hidden="true">→</span></Boton>
         )}
-        {puedeRevisarFecha && <Boton variante="secundario" onClick={onRevisarFecha}>Revisar disponibilidad de la fecha</Boton>}
+        {puedeRevisarFecha && <Boton variante="secundario" onClick={onRevisarFecha}>Revisar y habilitar la fecha</Boton>}
         {puedeEditar && confirmada && (
-          <Boton onClick={onRegistrarCambio}><span>Registrar cambio solicitado</span><span aria-hidden="true">→</span></Boton>
+          <Boton onClick={onRegistrarCambio}><span>Registrar cambio</span><span aria-hidden="true">→</span></Boton>
+        )}
+        {puedeEditar && !confirmada && (
+          <p className="text-xs text-stone-500">Se puede editar hasta que el evento se confirme. Después, los cambios se registran en Cambios y los aprueba Gerencia.</p>
         )}
       </div>
-      {confirmada && <HistorialEvento key={s.id} solicitudId={s.id} />}
+      {confirmada && <CambiosDelEvento key={s.id} solicitudId={s.id} />}
     </>
   );
 }
 
-// Lo que se le ha cambiado al evento
-function HistorialEvento({ solicitudId }) {
-  const { datos: historial, cargando } = useFetch(useCallback(() => cambioService.historialDeEvento(solicitudId), [solicitudId]));
+// Cambios pedidos para este evento, con enlace a Cambios
+function CambiosDelEvento({ solicitudId }) {
+  const { datos: cambios, cargando } = useFetch(useCallback(() => cambioService.listar('', solicitudId), [solicitudId]));
   return (
-    <section className="mt-5 border-t border-stone-200 pt-4" aria-label="Historial de modificaciones">
-      <Antetitulo className="mb-2.5">Historial de modificaciones</Antetitulo>
-      {cargando && !historial.length ? <p className="text-xs text-stone-500">Cargando…</p> : !historial.length ? (
-        <p className="text-xs text-stone-500">Sin modificaciones registradas.</p>
-      ) : (
-        <ul className="grid gap-2.5 text-sm">
-          {historial.map((h) => (
-            <li key={h.id}>
-              <strong>{etiquetaCampo(h.campo)}</strong>: {formatearValor(h.campo, h.valorAnterior)} → {formatearValor(h.campo, h.valorNuevo)}
-              <small className="mt-0.5 block text-stone-500">
-                {new Date(h.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })} · aplicado por {h.usuario}
-                {h.cambio.revisadoPor ? ` · aprobado por ${h.cambio.revisadoPor}` : ''} (cambio {h.cambio.codigo}: {h.cambio.motivo})
-              </small>
-            </li>
-          ))}
-        </ul>
-      )}
+    <section className="mt-5 border-t border-stone-200 pt-4" aria-label="Cambios del evento">
+      <Antetitulo className="mb-2.5">Cambios del evento</Antetitulo>
+      {cargando && !cambios.length ? <p className="text-xs text-stone-500">Cargando…</p> : <ListaCambios cambios={cambios} />}
     </section>
   );
 }
