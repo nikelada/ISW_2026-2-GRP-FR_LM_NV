@@ -2,7 +2,7 @@ import { formatearFecha } from './fechas.js';
 
 // Campos que se pueden pedir cambiar en un evento confirmado
 export const CAMPOS_EVENTO = [
-  { campo: 'tipoEvento', etiqueta: 'Tipo de evento', tipo: 'text' },
+  { campo: 'tipoEvento', etiqueta: 'Tipo de evento', tipo: 'lista' },
   { campo: 'fecha', etiqueta: 'Fecha', tipo: 'date' },
   { campo: 'horaInicio', etiqueta: 'Hora de inicio', tipo: 'time' },
   { campo: 'horaFin', etiqueta: 'Hora de término', tipo: 'time' },

@@ -1,7 +1,9 @@
 import { prisma } from '../config/prisma.js';
+import { crearConCodigo } from '../utils/codigo.js';
 import { fechaActual } from '../utils/fecha.js';
 import * as clienteService from './cliente.service.js';
 import { aRespuesta as aRespuestaServicio, INCLUIR_SERVICIO } from './servicio.service.js';
+import { asegurarTipoEvento } from './tipoEvento.service.js';
 
 // Información obligatoria para que la solicitud quede registrada.
 const CAMPOS_OBLIGATORIOS = [
@@ -33,12 +35,12 @@ export const aHora = (texto) => (texto ? new Date(`1970-01-01T${texto}:00Z`) : n
 export const textoFecha = (valor) => (valor ? valor.toISOString().slice(0, 10) : null);
 export const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
 
-// No se aceptan fechas anteriores a hoy
+// Solo se aceptan fechas desde mañana
 export function asegurarFechaNoPasada(fecha) {
-  if (fecha && fecha < textoFecha(fechaActual())) {
-    throw Object.assign(new Error('La fecha ya pasó; elige una fecha desde hoy en adelante.'), {
+  if (fecha && fecha <= textoFecha(fechaActual())) {
+    throw Object.assign(new Error('La fecha del evento tiene que ser desde mañana en adelante.'), {
       status: 400,
-      detalles: { errores: { fecha: 'La fecha no puede ser anterior a hoy.' } }
+      detalles: { errores: { fecha: 'La fecha no puede ser hoy ni un día anterior.' } }
     });
   }
 }
@@ -129,7 +131,8 @@ export async function obtenerPorId(id) {
 export async function crear(datos) {
   asegurarFechaNoPasada(datos.fecha);
   await asegurarClienteRegistrado(datos.clienteId);
-  const creada = await prisma.solicitud.create({ data: aDatos(datos), include: INCLUIR_SOLICITUD });
+  await asegurarTipoEvento(datos.tipoEvento);
+  const creada = await crearConCodigo(prisma.solicitud, 'SOL', { data: aDatos(datos), include: INCLUIR_SOLICITUD });
   return aRespuesta(creada);
 }
 
@@ -142,6 +145,7 @@ export async function actualizar(id, datos) {
   // Solo si cambió, para poder seguir completando una solicitud antigua
   if (datos.fecha !== actual.fecha) asegurarFechaNoPasada(datos.fecha);
   if (datos.clienteId !== actual.clienteId) await asegurarClienteRegistrado(datos.clienteId);
+  if (datos.tipoEvento !== actual.tipoEvento) await asegurarTipoEvento(datos.tipoEvento);
 
   const data = aDatos(datos, actual.servicios);
   // Si cambió la fecha u hora hay que volver a revisar la disponibilidad

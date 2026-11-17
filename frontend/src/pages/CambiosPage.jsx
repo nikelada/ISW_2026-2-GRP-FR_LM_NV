@@ -3,6 +3,7 @@ import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoCambio, { ESTADOS_CAMBIO } from '../components/EstadoCambio.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
+import SelectorTipoEvento from '../components/SelectorTipoEvento.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Boton from '../components/ui/Boton.jsx';
@@ -14,7 +15,7 @@ import { useFetch } from '../hooks/useFetch.js';
 import * as cambioService from '../services/cambioService.js';
 import * as solicitudService from '../services/solicitudService.js';
 import { CAMPOS_EVENTO, etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
-import { formatearFecha, formatearHorario } from '../utils/fechas.js';
+import { fechaMinima, formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esGerencia, esProduccion } from '../utils/roles.js';
 
 // Marcar un factor significa que ya se revisó, no que esté todo bien
@@ -58,7 +59,7 @@ const CHECK = 'flex items-center gap-2 text-sm font-normal text-stone-800';
 const fechaHora = (valor) => new Date(valor).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' });
 
 const columnas = [
-  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (c) => `#${c.id}` },
+  { campo: 'codigo', titulo: 'Código', className: 'whitespace-nowrap text-stone-500' },
   {
     campo: 'evento',
     titulo: 'Evento',
@@ -122,7 +123,7 @@ export default function CambiosPage({ user, params }) {
         </Panel>
         <Panel lateral>
           {nuevo ? (
-            <NuevoCambio eventoInicial={Number(params.get('evento')) || ''} onCancelar={() => setNuevo(false)} onRegistrado={(c) => alTerminar(c, `Cambio #${c.id} registrado; queda pendiente de revisión de Gerencia.`)} />
+            <NuevoCambio eventoInicial={Number(params.get('evento')) || ''} onCancelar={() => setNuevo(false)} onRegistrado={(c) => alTerminar(c, `Cambio ${c.codigo} registrado; queda pendiente de revisión de Gerencia.`)} />
           ) : seleccionado ? (
             <DetalleCambio key={seleccionado.id} cambio={seleccionado} aviso={aviso} gerencia={gerencia} produccion={produccion} onTerminar={alTerminar} />
           ) : (
@@ -190,11 +191,14 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
                   <input type="checkbox" name={`cambiar-${campo}`} checked={!!seleccion[campo]} onChange={(e) => setSeleccion({ ...seleccion, [campo]: e.target.checked })} />
                   <span>{etiqueta}</span>
                 </label>
-                {seleccion[campo] && (
+                {seleccion[campo] && tipo === 'lista' && (
+                  <SelectorTipoEvento name={campo} error={errores[campo]} value={valores[campo]} onChange={(valor) => setValores((actual) => ({ ...actual, [campo]: valor }))} />
+                )}
+                {seleccion[campo] && tipo !== 'lista' && (
                   <Campo error={errores[campo]}>
                     {tipo === 'textarea'
                       ? <textarea name={campo} value={valores[campo]} onChange={(e) => setValores({ ...valores, [campo]: e.target.value })} />
-                      : <input type={tipo} name={campo} min={tipo === 'number' ? 1 : undefined} value={valores[campo]} onChange={(e) => setValores({ ...valores, [campo]: e.target.value })} />}
+                      : <input type={tipo} name={campo} min={tipo === 'number' ? 1 : tipo === 'date' ? fechaMinima() : undefined} value={valores[campo]} onChange={(e) => setValores({ ...valores, [campo]: e.target.value })} />}
                   </Campo>
                 )}
               </div>
@@ -247,7 +251,7 @@ function DetalleCambio({ cambio, aviso, gerencia, produccion, onTerminar }) {
 
   return (
     <>
-      <Antetitulo className="mb-2">Cambio #{cambio.id}</Antetitulo>
+      <Antetitulo className="mb-2">Cambio {cambio.codigo}</Antetitulo>
       <h2 className="mb-2 text-xl font-bold">{evento.cliente.nombre}</h2>
       <div className="mb-4"><EstadoCambio cambio={cambio} /></div>
       {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}

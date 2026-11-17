@@ -33,7 +33,7 @@ function ResultadoCotizacion({ cotizacion }) {
 const esEvento = (registro) => registro.estado === 'confirmado';
 
 const columnas = [
-  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (r) => `#${r.id}` },
+  { campo: 'codigo', titulo: 'Código', className: 'whitespace-nowrap text-stone-500' },
   {
     campo: 'tipo',
     titulo: 'Registro',
@@ -62,11 +62,20 @@ export default function HistorialPage({ user, params }) {
   const [busqueda, setBusqueda] = useState('');
   const [q, setQ] = useState('');
   const { datos: encontrados } = useFetch(useCallback(() => (puedeConsultar && q ? clienteService.listar(q) : Promise.resolve([])), [puedeConsultar, q]));
-  const [clienteId, setClienteId] = useState(params.get('cliente') || '');
+  const [cliente, setCliente] = useState(null);
+  const rutInicial = params.get('cliente');
   const { datos: historial, cargando, error } = useFetch(
-    useCallback(() => (clienteId ? clienteService.historial(clienteId) : Promise.resolve(null)), [clienteId]),
+    useCallback(() => (cliente ? clienteService.historial(cliente.id) : Promise.resolve(null)), [cliente]),
     null
   );
+
+  // Si se llega desde Clientes, el cliente viene por su RUT
+  useEffect(() => {
+    if (!puedeConsultar || !rutInicial) return;
+    clienteService.listar(rutInicial)
+      .then((lista) => setCliente(lista.find((c) => c.rut === rutInicial) || null))
+      .catch(() => setCliente(null));
+  }, [puedeConsultar, rutInicial]);
   const [seleccionadoId, setSeleccionadoId] = useState(null);
   const [filtro, setFiltro] = useState('');
   const registros = historial?.registros || [];
@@ -85,8 +94,8 @@ export default function HistorialPage({ user, params }) {
     return () => clearTimeout(timer);
   }, [busqueda]);
 
-  function elegirCliente(cliente) {
-    setClienteId(String(cliente.id));
+  function elegirCliente(elegido) {
+    setCliente(elegido);
     setSeleccionadoId(null);
     setBusqueda('');
   }
@@ -132,7 +141,7 @@ export default function HistorialPage({ user, params }) {
             </p>
           )}
           {error && <Aviso tipo="error" className="m-3.5">{error}</Aviso>}
-          {!clienteId ? (
+          {!cliente ? (
             <Vacio>Busca un cliente para ver su historial.</Vacio>
           ) : cargando && !historial ? (
             <Vacio>Cargando…</Vacio>
@@ -158,7 +167,7 @@ export default function HistorialPage({ user, params }) {
 function DetalleRegistro({ registro: r }) {
   return (
     <>
-      <Antetitulo className="mb-2">{esEvento(r) ? 'Evento' : 'Solicitud'} #{r.id}</Antetitulo>
+      <Antetitulo className="mb-2">{esEvento(r) ? 'Evento' : 'Solicitud'} {r.codigo}</Antetitulo>
       <h2 className="mb-2 text-xl font-bold">{r.tipoEvento || 'Sin tipo de evento'}</h2>
       <div className="mb-3"><EstadoBadge estado={r.estado} fechaHabilitada={r.fechaHabilitada} /></div>
       {r.faltantes.length > 0 && !esEvento(r) && (
@@ -191,7 +200,7 @@ function DetalleRegistro({ registro: r }) {
             {r.cambios.map((c) => (
               <li key={c.id} className="rounded-md border border-stone-200 p-3">
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <a className="font-semibold text-teal-700 hover:underline" href={`#/cambios?id=${c.id}`}>Cambio #{c.id}</a>
+                  <a className="whitespace-nowrap font-semibold text-teal-700 hover:underline" href={`#/cambios?id=${c.id}`}>Cambio {c.codigo}</a>
                   <span><EstadoCambio cambio={c} /></span>
                 </div>
                 <ul className="mb-1">
@@ -217,7 +226,7 @@ function DetalleRegistro({ registro: r }) {
             {r.historial.map((h) => (
               <li key={h.id}>
                 <strong>{etiquetaCampo(h.campo)}</strong>: {formatearValor(h.campo, h.valorAnterior)} → {formatearValor(h.campo, h.valorNuevo)}
-                <small className="block text-stone-500">{fechaHora(h.createdAt)} · aplicado por {h.usuario} (cambio #{h.cambioId})</small>
+                <small className="block text-stone-500">{fechaHora(h.createdAt)} · aplicado por {h.usuario} (cambio {h.cambio.codigo})</small>
               </li>
             ))}
           </ul>

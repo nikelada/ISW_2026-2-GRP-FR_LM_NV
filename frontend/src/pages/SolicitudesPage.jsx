@@ -3,6 +3,7 @@ import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoBadge from '../components/EstadoBadge.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
+import SelectorTipoEvento from '../components/SelectorTipoEvento.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Boton from '../components/ui/Boton.jsx';
@@ -17,7 +18,7 @@ import * as clienteService from '../services/clienteService.js';
 import * as solicitudService from '../services/solicitudService.js';
 import * as servicioService from '../services/servicioService.js';
 import { etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
-import { formatearFecha, formatearHorario } from '../utils/fechas.js';
+import { fechaMinima, formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
 const VACIO = { clienteId: '', tipoEvento: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '', requerimientosTecnicos: '' };
@@ -41,7 +42,7 @@ function textoPrecioServicio(version) {
 const sinDato = (texto = '—') => <span className="text-xs text-amber-700">{texto}</span>;
 
 const columnas = [
-  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (s) => `#${s.id}` },
+  { campo: 'codigo', titulo: 'Código', className: 'whitespace-nowrap text-stone-500' },
   {
     campo: 'cliente',
     titulo: 'Cliente',
@@ -71,14 +72,14 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
   const { datos: solicitudes, cargando, error, recargar } = useFetch(useCallback(() => solicitudService.listar(filtro), [filtro]));
   const texto = busqueda.trim().toLowerCase();
   const visibles = texto
-    ? solicitudes.filter((s) => `${s.cliente.nombre} ${s.tipoEvento || ''}`.toLowerCase().includes(texto))
+    ? solicitudes.filter((s) => `${s.codigo} ${s.cliente.nombre} ${s.tipoEvento || ''}`.toLowerCase().includes(texto))
     : solicitudes;
   const { datos: clientes } = useFetch(useCallback(() => clienteService.listar(), []));
   const { datos: serviciosDisponibles, error: errorServicios } = useFetch(useCallback(() => servicioService.listar(), []));
 
   const [seleccionada, setSeleccionada] = useState(null);
   const [modo, setModo] = useState(puedeEditar && params.get('nueva') === '1' ? 'nueva' : 'detalle');
-  const [form, setForm] = useState({ ...VACIO, clienteId: params.get('cliente') || '' });
+  const [form, setForm] = useState(VACIO);
   const [errores, setErrores] = useState({});
   const [aviso, setAviso] = useState(null);
   const [guardando, setGuardando] = useState(false);
@@ -87,6 +88,13 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
   const [servicioProcesando, setServicioProcesando] = useState('');
   const [resultado, setResultado] = useState(null);
   const idInicial = Number(params.get('id')) || null;
+  const rutCliente = params.get('cliente');
+
+  // Si se llega desde Clientes, el cliente viene por su RUT
+  useEffect(() => {
+    const cliente = rutCliente && clientes.find((c) => c.rut === rutCliente);
+    if (cliente) setForm((actual) => (actual.clienteId ? actual : { ...actual, clienteId: String(cliente.id) }));
+  }, [clientes, rutCliente]);
 
   // Actualiza el detalle cuando se recarga la lista y abre la solicitud que venga en la URL
   // (por ejemplo cuando se llega desde el calendario)
@@ -145,7 +153,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
       setSeleccionada(guardada);
       setModo('detalle');
       setErrores({});
-      setAviso({ tipo: 'success', texto: `Solicitud #${guardada.id} guardada.` });
+      setAviso({ tipo: 'success', texto: `Solicitud ${guardada.codigo} guardada.` });
       limpiarParametros();
       recargar();
     } catch (e) {
@@ -222,7 +230,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
-            <input type="search" placeholder="Buscar por cliente o tipo de evento" aria-label="Buscar solicitudes" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <input type="search" placeholder="Buscar por código, cliente o tipo de evento" aria-label="Buscar solicitudes" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
             <select className="w-auto" aria-label="Filtrar por estado" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
               <option value="">Todos los estados</option>
               <option value="pendiente">Pendientes de información</option>
@@ -262,7 +270,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
             />
           ) : (
             <>
-              <Antetitulo className="mb-2">{modo === 'editar' ? `Solicitud #${seleccionada.id}` : 'Nueva solicitud'}</Antetitulo>
+              <Antetitulo className="mb-2">{modo === 'editar' ? `Solicitud ${seleccionada.codigo}` : 'Nueva solicitud'}</Antetitulo>
               <h2 className="mb-4 text-xl font-bold">{modo === 'editar' ? 'Actualizar solicitud' : 'Registrar solicitud'}</h2>
               {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
               {!clientes.length && <Aviso tipo="warning"><p>No hay clientes registrados. Registra primero el cliente en la sección Clientes.</p></Aviso>}
@@ -273,8 +281,8 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
                     {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.rut ? ` · ${c.rut}` : ''}</option>)}
                   </select>
                 </Campo>
-                <Campo etiqueta="Tipo de evento" error={errores.tipoEvento}><input type="text" maxLength={100} placeholder="Ej.: matrimonio, seminario" {...campo('tipoEvento')} /></Campo>
-                <Campo etiqueta="Fecha" error={errores.fecha}><input type="date" {...campo('fecha')} /></Campo>
+                <SelectorTipoEvento etiqueta="Tipo de evento" error={errores.tipoEvento} value={form.tipoEvento} onChange={(tipoEvento) => setForm((actual) => ({ ...actual, tipoEvento }))} />
+                <Campo etiqueta="Fecha" error={errores.fecha}><input type="date" min={fechaMinima()} {...campo('fecha')} /></Campo>
                 <div className="grid grid-cols-2 gap-3">
                   <Campo etiqueta="Hora de inicio" error={errores.horaInicio}><input type="time" {...campo('horaInicio')} /></Campo>
                   <Campo etiqueta="Hora de término" error={errores.horaFin}><input type="time" {...campo('horaFin')} /></Campo>
@@ -341,7 +349,7 @@ function DetalleSolicitud({
   const servicioSeleccionado = serviciosDelTipo.find((servicio) => servicio.id === Number(servicioParaAgregar));
   return (
     <>
-      <Antetitulo className="mb-2">Solicitud #{s.id}</Antetitulo>
+      <Antetitulo className="mb-2">Solicitud {s.codigo}</Antetitulo>
       <h2 className="mb-2 text-xl font-bold">{s.cliente.nombre}</h2>
       <div className="mb-4" data-estado-detalle><EstadoBadge estado={s.estado} fechaHabilitada={s.fechaHabilitada} /></div>
       {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
@@ -472,7 +480,7 @@ function HistorialEvento({ solicitudId }) {
               <strong>{etiquetaCampo(h.campo)}</strong>: {formatearValor(h.campo, h.valorAnterior)} → {formatearValor(h.campo, h.valorNuevo)}
               <small className="mt-0.5 block text-stone-500">
                 {new Date(h.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })} · aplicado por {h.usuario}
-                {h.cambio.revisadoPor ? ` · aprobado por ${h.cambio.revisadoPor}` : ''} (cambio #{h.cambio.id}: {h.cambio.motivo})
+                {h.cambio.revisadoPor ? ` · aprobado por ${h.cambio.revisadoPor}` : ''} (cambio {h.cambio.codigo}: {h.cambio.motivo})
               </small>
             </li>
           ))}
