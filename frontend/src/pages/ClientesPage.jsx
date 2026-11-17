@@ -123,7 +123,7 @@ export default function ClientesPage({ user, onNavegar }) {
               <Campo etiqueta="RUT" error={errores.rut}><input type="text" maxLength={12} placeholder="12.345.678-5" {...campo('rut')} /></Campo>
               <Campo etiqueta="Nombre" error={errores.nombre}><input type="text" maxLength={150} {...campo('nombre')} /></Campo>
               <Campo etiqueta="Teléfono" error={errores.telefono}><input type="tel" maxLength={30} placeholder="+56 9 1234 5678" {...campo('telefono')} /></Campo>
-              <Campo etiqueta="Correo" error={errores.correo}><input type="email" maxLength={255} {...campo('correo')} /></Campo>
+              <Campo etiqueta="Correo" error={errores.correo}><input type="email" maxLength={255} placeholder="nombre@empresa.cl" {...campo('correo')} /></Campo>
               <p className="text-xs text-stone-500">Todos los campos son obligatorios.</p>
               <div className="flex gap-2.5">
                 <Boton type="submit" className="flex-1" disabled={guardando}>
