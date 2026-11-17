@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { crearConCodigo } from '../utils/codigo.js';
 import { asegurarFechaLibre, buscarConflictos } from './calendario.service.js';
 import { aFecha, aHora, asegurarFechaNoPasada, obtenerPorId as obtenerEvento } from './solicitud.service.js';
 import { asegurarTipoEvento } from './tipoEvento.service.js';
@@ -71,7 +72,7 @@ export async function registrar({ solicitudId, cambios, motivo }, usuario) {
     throw httpError(400, 'Revisa los datos del cambio.', { errores: { horaFin: 'La hora de término debe ser posterior a la de inicio.' } });
   }
 
-  const creado = await prisma.solicitudCambio.create({
+  const creado = await crearConCodigo(prisma.solicitudCambio, 'CAM', {
     data: { solicitudId, cambios: distintos, motivo, registradoPor: usuario.name }
   });
   return conDetalle(creado);
@@ -137,7 +138,7 @@ export async function historialDeEvento(solicitudId) {
   await obtenerEvento(solicitudId);
   return prisma.historialEvento.findMany({
     where: { solicitudId },
-    include: { cambio: { select: { id: true, motivo: true, revisadoPor: true, revisadoEn: true } } },
+    include: { cambio: { select: { id: true, codigo: true, motivo: true, revisadoPor: true, revisadoEn: true } } },
     orderBy: { createdAt: 'desc' }
   });
 }

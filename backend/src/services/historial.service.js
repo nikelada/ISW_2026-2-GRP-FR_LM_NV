@@ -15,7 +15,7 @@ export async function historialDeCliente(clienteId) {
     include: {
       ...INCLUIR_SOLICITUD,
       cambios: { orderBy: { createdAt: 'desc' } },
-      historial: { orderBy: { createdAt: 'desc' } }
+      historial: { orderBy: { createdAt: 'desc' }, include: { cambio: { select: { codigo: true } } } }
     },
     orderBy: { createdAt: 'desc' }
   });

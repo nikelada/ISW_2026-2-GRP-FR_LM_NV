@@ -2,6 +2,7 @@
 // Uso normal: npm run seed
 // Uso acumulativo: npm run seed -- --merge
 import { PrismaClient } from '@prisma/client';
+import { siguienteCodigo } from '../src/utils/codigo.js';
 
 const prisma = new PrismaClient();
 const argumentos = new Set(process.argv.slice(2));
@@ -123,7 +124,8 @@ async function obtenerFirmasSolicitudes() {
 
 async function crearSolicitudConServicios(datos, servicios) {
   return prisma.$transaction(async (transaction) => {
-    const solicitud = await transaction.solicitud.create({ data: datos });
+    const codigo = await siguienteCodigo(transaction.solicitud, 'SOL');
+    const solicitud = await transaction.solicitud.create({ data: { ...datos, codigo } });
     await transaction.solicitudServicio.createMany({
       data: servicios.map((servicio) => ({ solicitudId: solicitud.id, ...referenciaServicio(servicio) })),
       skipDuplicates: true
@@ -142,6 +144,7 @@ async function crearCambios(solicitudId, cambios) {
     const revisado = datos.estado !== 'pendiente';
     const cambio = await prisma.solicitudCambio.create({
       data: {
+        codigo: await siguienteCodigo(prisma.solicitudCambio, 'CAM'),
         solicitudId,
         ...datos,
         registradoPor: USUARIO_PRODUCCION,

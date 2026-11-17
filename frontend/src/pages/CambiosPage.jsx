@@ -59,7 +59,7 @@ const CHECK = 'flex items-center gap-2 text-sm font-normal text-stone-800';
 const fechaHora = (valor) => new Date(valor).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' });
 
 const columnas = [
-  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (c) => `#${c.id}` },
+  { campo: 'codigo', titulo: 'Código', className: 'whitespace-nowrap text-stone-500' },
   {
     campo: 'evento',
     titulo: 'Evento',
@@ -123,7 +123,7 @@ export default function CambiosPage({ user, params }) {
         </Panel>
         <Panel lateral>
           {nuevo ? (
-            <NuevoCambio eventoInicial={Number(params.get('evento')) || ''} onCancelar={() => setNuevo(false)} onRegistrado={(c) => alTerminar(c, `Cambio #${c.id} registrado; queda pendiente de revisión de Gerencia.`)} />
+            <NuevoCambio eventoInicial={Number(params.get('evento')) || ''} onCancelar={() => setNuevo(false)} onRegistrado={(c) => alTerminar(c, `Cambio ${c.codigo} registrado; queda pendiente de revisión de Gerencia.`)} />
           ) : seleccionado ? (
             <DetalleCambio key={seleccionado.id} cambio={seleccionado} aviso={aviso} gerencia={gerencia} produccion={produccion} onTerminar={alTerminar} />
           ) : (
@@ -251,7 +251,7 @@ function DetalleCambio({ cambio, aviso, gerencia, produccion, onTerminar }) {
 
   return (
     <>
-      <Antetitulo className="mb-2">Cambio #{cambio.id}</Antetitulo>
+      <Antetitulo className="mb-2">Cambio {cambio.codigo}</Antetitulo>
       <h2 className="mb-2 text-xl font-bold">{evento.cliente.nombre}</h2>
       <div className="mb-4"><EstadoCambio cambio={cambio} /></div>
       {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}

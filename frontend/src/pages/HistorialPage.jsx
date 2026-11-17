@@ -33,7 +33,7 @@ function ResultadoCotizacion({ cotizacion }) {
 const esEvento = (registro) => registro.estado === 'confirmado';
 
 const columnas = [
-  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (r) => `#${r.id}` },
+  { campo: 'codigo', titulo: 'Código', className: 'whitespace-nowrap text-stone-500' },
   {
     campo: 'tipo',
     titulo: 'Registro',
@@ -158,7 +158,7 @@ export default function HistorialPage({ user, params }) {
 function DetalleRegistro({ registro: r }) {
   return (
     <>
-      <Antetitulo className="mb-2">{esEvento(r) ? 'Evento' : 'Solicitud'} #{r.id}</Antetitulo>
+      <Antetitulo className="mb-2">{esEvento(r) ? 'Evento' : 'Solicitud'} {r.codigo}</Antetitulo>
       <h2 className="mb-2 text-xl font-bold">{r.tipoEvento || 'Sin tipo de evento'}</h2>
       <div className="mb-3"><EstadoBadge estado={r.estado} fechaHabilitada={r.fechaHabilitada} /></div>
       {r.faltantes.length > 0 && !esEvento(r) && (
@@ -191,7 +191,7 @@ function DetalleRegistro({ registro: r }) {
             {r.cambios.map((c) => (
               <li key={c.id} className="rounded-md border border-stone-200 p-3">
                 <div className="mb-1 flex items-center justify-between gap-2">
-                  <a className="font-semibold text-teal-700 hover:underline" href={`#/cambios?id=${c.id}`}>Cambio #{c.id}</a>
+                  <a className="whitespace-nowrap font-semibold text-teal-700 hover:underline" href={`#/cambios?id=${c.id}`}>Cambio {c.codigo}</a>
                   <span><EstadoCambio cambio={c} /></span>
                 </div>
                 <ul className="mb-1">
@@ -217,7 +217,7 @@ function DetalleRegistro({ registro: r }) {
             {r.historial.map((h) => (
               <li key={h.id}>
                 <strong>{etiquetaCampo(h.campo)}</strong>: {formatearValor(h.campo, h.valorAnterior)} → {formatearValor(h.campo, h.valorNuevo)}
-                <small className="block text-stone-500">{fechaHora(h.createdAt)} · aplicado por {h.usuario} (cambio #{h.cambioId})</small>
+                <small className="block text-stone-500">{fechaHora(h.createdAt)} · aplicado por {h.usuario} (cambio {h.cambio.codigo})</small>
               </li>
             ))}
           </ul>

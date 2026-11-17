@@ -62,6 +62,8 @@ enum EstadoVersionServicio {
 // Solicitud de evento. Si le falta algún dato queda pendiente
 model Solicitud {
   id                     Int                 @id @default(autoincrement())
+  // se muestra en vez del id (SOL-2026-0001)
+  codigo                 String              @unique @db.VarChar(20)
   clienteId              Int
   cliente                Cliente             @relation(fields: [clienteId], references: [id], onDelete: Restrict)
   // se elige de la lista de tipos de evento
@@ -124,6 +126,8 @@ enum EstadoCambio {
 // Cambio que pide el cliente sobre un evento ya confirmado
 model SolicitudCambio {
   id                   Int               @id @default(autoincrement())
+  // se muestra en vez del id (CAM-2026-0001)
+  codigo               String            @unique @db.VarChar(20)
   solicitudId          Int
   solicitud            Solicitud         @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
   // ej: { "horaFin": "23:59", "lugar": "Salón Sur" }

@@ -42,7 +42,7 @@ function textoPrecioServicio(version) {
 const sinDato = (texto = '—') => <span className="text-xs text-amber-700">{texto}</span>;
 
 const columnas = [
-  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (s) => `#${s.id}` },
+  { campo: 'codigo', titulo: 'Código', className: 'whitespace-nowrap text-stone-500' },
   {
     campo: 'cliente',
     titulo: 'Cliente',
@@ -72,7 +72,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
   const { datos: solicitudes, cargando, error, recargar } = useFetch(useCallback(() => solicitudService.listar(filtro), [filtro]));
   const texto = busqueda.trim().toLowerCase();
   const visibles = texto
-    ? solicitudes.filter((s) => `${s.cliente.nombre} ${s.tipoEvento || ''}`.toLowerCase().includes(texto))
+    ? solicitudes.filter((s) => `${s.codigo} ${s.cliente.nombre} ${s.tipoEvento || ''}`.toLowerCase().includes(texto))
     : solicitudes;
   const { datos: clientes } = useFetch(useCallback(() => clienteService.listar(), []));
   const { datos: serviciosDisponibles, error: errorServicios } = useFetch(useCallback(() => servicioService.listar(), []));
@@ -146,7 +146,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
       setSeleccionada(guardada);
       setModo('detalle');
       setErrores({});
-      setAviso({ tipo: 'success', texto: `Solicitud #${guardada.id} guardada.` });
+      setAviso({ tipo: 'success', texto: `Solicitud ${guardada.codigo} guardada.` });
       limpiarParametros();
       recargar();
     } catch (e) {
@@ -223,7 +223,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
-            <input type="search" placeholder="Buscar por cliente o tipo de evento" aria-label="Buscar solicitudes" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <input type="search" placeholder="Buscar por código, cliente o tipo de evento" aria-label="Buscar solicitudes" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
             <select className="w-auto" aria-label="Filtrar por estado" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
               <option value="">Todos los estados</option>
               <option value="pendiente">Pendientes de información</option>
@@ -263,7 +263,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
             />
           ) : (
             <>
-              <Antetitulo className="mb-2">{modo === 'editar' ? `Solicitud #${seleccionada.id}` : 'Nueva solicitud'}</Antetitulo>
+              <Antetitulo className="mb-2">{modo === 'editar' ? `Solicitud ${seleccionada.codigo}` : 'Nueva solicitud'}</Antetitulo>
               <h2 className="mb-4 text-xl font-bold">{modo === 'editar' ? 'Actualizar solicitud' : 'Registrar solicitud'}</h2>
               {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
               {!clientes.length && <Aviso tipo="warning"><p>No hay clientes registrados. Registra primero el cliente en la sección Clientes.</p></Aviso>}
@@ -342,7 +342,7 @@ function DetalleSolicitud({
   const servicioSeleccionado = serviciosDelTipo.find((servicio) => servicio.id === Number(servicioParaAgregar));
   return (
     <>
-      <Antetitulo className="mb-2">Solicitud #{s.id}</Antetitulo>
+      <Antetitulo className="mb-2">Solicitud {s.codigo}</Antetitulo>
       <h2 className="mb-2 text-xl font-bold">{s.cliente.nombre}</h2>
       <div className="mb-4" data-estado-detalle><EstadoBadge estado={s.estado} fechaHabilitada={s.fechaHabilitada} /></div>
       {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
@@ -473,7 +473,7 @@ function HistorialEvento({ solicitudId }) {
               <strong>{etiquetaCampo(h.campo)}</strong>: {formatearValor(h.campo, h.valorAnterior)} → {formatearValor(h.campo, h.valorNuevo)}
               <small className="mt-0.5 block text-stone-500">
                 {new Date(h.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })} · aplicado por {h.usuario}
-                {h.cambio.revisadoPor ? ` · aprobado por ${h.cambio.revisadoPor}` : ''} (cambio #{h.cambio.id}: {h.cambio.motivo})
+                {h.cambio.revisadoPor ? ` · aprobado por ${h.cambio.revisadoPor}` : ''} (cambio {h.cambio.codigo}: {h.cambio.motivo})
               </small>
             </li>
           ))}

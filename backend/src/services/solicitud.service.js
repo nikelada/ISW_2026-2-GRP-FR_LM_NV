@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { crearConCodigo } from '../utils/codigo.js';
 import { fechaActual } from '../utils/fecha.js';
 import * as clienteService from './cliente.service.js';
 import { aRespuesta as aRespuestaServicio, INCLUIR_SERVICIO } from './servicio.service.js';
@@ -131,7 +132,7 @@ export async function crear(datos) {
   asegurarFechaNoPasada(datos.fecha);
   await asegurarClienteRegistrado(datos.clienteId);
   await asegurarTipoEvento(datos.tipoEvento);
-  const creada = await prisma.solicitud.create({ data: aDatos(datos), include: INCLUIR_SOLICITUD });
+  const creada = await crearConCodigo(prisma.solicitud, 'SOL', { data: aDatos(datos), include: INCLUIR_SOLICITUD });
   return aRespuesta(creada);
 }
 
