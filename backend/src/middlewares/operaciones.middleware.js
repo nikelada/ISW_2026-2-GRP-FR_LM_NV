@@ -1,12 +1,12 @@
 import { esFechaValida, esHoraValida } from './solicitud.middleware.js';
 
-const TIPOS_RECURSO = ['equipo', 'espacio', 'vehiculo'];
+const TIPOS_RECURSO = ['espacio'];
 const ESTADOS_RECURSO = ['disponible', 'en_uso', 'mantencion', 'fuera_servicio'];
 
 export function validarRecurso(req, res, next) {
   const nombre = String(req.body.nombre || '').trim();
   const tipo = String(req.body.tipo || '');
-  const categoria = String(req.body.categoria || '').trim();
+  const ubicacion = String(req.body.ubicacion || '').trim();
   const estado = String(req.body.estado || 'disponible');
   if (!nombre || nombre.length > 150) {
     return res.status(400).json({ message: 'El nombre es obligatorio y no puede superar 150 caracteres.' });
@@ -14,20 +14,19 @@ export function validarRecurso(req, res, next) {
   if (!TIPOS_RECURSO.includes(tipo)) {
     return res.status(400).json({ message: 'Selecciona un tipo de recurso válido.' });
   }
-  if (!categoria || categoria.length > 100) {
-    return res.status(400).json({ message: 'La categoría es obligatoria y no puede superar 100 caracteres.' });
+  if (!ubicacion || ubicacion.length > 255) {
+    return res.status(400).json({ message: 'La ubicación es obligatoria y no puede superar 255 caracteres.' });
   }
   if (!ESTADOS_RECURSO.includes(estado)) {
     return res.status(400).json({ message: 'Selecciona un estado de recurso válido.' });
   }
-  req.body = { nombre, tipo, categoria, estado };
+  req.body = { nombre, tipo, categoria: 'Sin categoría', ubicacion, estado };
   next();
 }
 
 export function validarConsultaRecursos(req, res, next) {
   const { fecha = '', horaInicio = '', horaFin = '' } = req.query;
   const tipo = String(req.query.tipo || '');
-  const categoria = String(req.query.categoria || '').trim();
   const solicitudId = req.query.solicitudId ? Number(req.query.solicitudId) : undefined;
   if (!esFechaValida(String(fecha)) || !esHoraValida(String(horaInicio)) || !esHoraValida(String(horaFin))) {
     return res.status(400).json({ message: 'Indica fecha, hora de inicio y hora de término válidas.' });
@@ -45,8 +44,7 @@ export function validarConsultaRecursos(req, res, next) {
     fecha: String(fecha),
     horaInicio: String(horaInicio).slice(0, 5),
     horaFin: String(horaFin).slice(0, 5),
-    tipo: tipo || undefined,
-    categoria: categoria || undefined,
+    tipo: tipo || 'espacio',
     solicitudId
   };
   next();

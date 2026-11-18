@@ -12,11 +12,6 @@ const manejar = (accion) => async (req, res, next) => {
 
 export const listarEventos = manejar(() => operacionesService.listarEventos());
 export const obtenerOperacion = manejar((req) => operacionesService.obtenerOperacion(req.params.id));
-export const listarRecursos = manejar(() => operacionesService.listarRecursos());
-export const crearRecurso = manejar((req) => operacionesService.crearRecurso(req.body));
-export const actualizarRecurso = manejar((req) => operacionesService.actualizarRecurso(req.params.id, req.body));
-export const consultarDisponibilidad = manejar((req) => operacionesService.consultarDisponibilidad(req.consulta));
-export const reservarRecurso = manejar((req) => operacionesService.reservarRecurso(req.params.id, req.body.recursoId));
 export const devolverRecurso = manejar((req) => operacionesService.devolverRecurso(req.params.id));
 export const listarContactos = manejar(() => operacionesService.listarContactos());
 export const asignarPersonal = manejar((req) => operacionesService.asignarPersonal(req.params.id, req.body));

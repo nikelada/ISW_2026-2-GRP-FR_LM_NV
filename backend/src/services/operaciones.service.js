@@ -1,5 +1,4 @@
 import { prisma } from '../config/prisma.js';
-import { aFecha, aHora } from './solicitud.service.js';
 
 const textoFecha = (valor) => (valor ? valor.toISOString().slice(0, 10) : null);
 const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
@@ -45,7 +44,11 @@ export async function asegurarEventoAbierto(id) {
 }
 
 function condicionCierre(evento) {
-  const reservasDevueltas = evento.reservasRecursos.every((reserva) => Boolean(reserva.devueltoEn));
+  const inventarioDevuelto = (evento.reservasInventario || []).every((reserva) =>
+    !reserva.inventario.reutilizable || Boolean(reserva.devueltoEn)
+  );
+  const reservasDevueltas = evento.reservasRecursos.every((reserva) => Boolean(reserva.devueltoEn))
+    && inventarioDevuelto;
   const tareasCompletadas = evento.tareas.every((tarea) => tarea.estado === 'completada');
   const pagosCompletados = evento.pagos.every((pago) => pago.estado === 'pagado');
   const encuestaConforme = evento.cierre?.encuestaConforme === true;
@@ -79,7 +82,12 @@ function respuestaEvento(evento) {
 const INCLUIR_OPERACION = {
   ...INCLUIR_EVENTO,
   reservasRecursos: {
+    where: { recurso: { is: { tipo: { not: 'equipo' } } } },
     include: { recurso: true },
+    orderBy: { createdAt: 'asc' }
+  },
+  reservasInventario: {
+    include: { inventario: true },
     orderBy: { createdAt: 'asc' }
   },
   personalAsignado: {
@@ -109,100 +117,6 @@ export async function obtenerOperacion(id) {
   const evento = await prisma.solicitud.findUnique({ where: { id }, include: INCLUIR_OPERACION });
   if (!evento) throw errorConEstado('Evento no encontrado.', 404);
   return respuestaEvento(evento);
-}
-
-export async function listarRecursos() {
-  return prisma.recursoOperativo.findMany({ orderBy: [{ tipo: 'asc' }, { nombre: 'asc' }] });
-}
-
-export async function crearRecurso(datos) {
-  return prisma.recursoOperativo.create({ data: datos });
-}
-
-export async function actualizarRecurso(id, datos) {
-  const existe = await prisma.recursoOperativo.findUnique({ where: { id } });
-  if (!existe) throw errorConEstado('Recurso no encontrado.', 404);
-  return prisma.recursoOperativo.update({ where: { id }, data: datos });
-}
-
-function filtroReserva(fecha, horaInicio, horaFin, excluirSolicitudId) {
-  return {
-    solicitud: {
-      is: {
-        estado: 'confirmado',
-        fecha: aFecha(fecha),
-        horaInicio: { lt: aHora(horaFin) },
-        horaFin: { gt: aHora(horaInicio) },
-        id: excluirSolicitudId ? { not: excluirSolicitudId } : undefined
-      }
-    }
-  };
-}
-
-export async function consultarDisponibilidad(consulta) {
-  const recursos = await prisma.recursoOperativo.findMany({
-    where: {
-      tipo: consulta.tipo,
-      categoria: consulta.categoria ? { equals: consulta.categoria, mode: 'insensitive' } : undefined
-    },
-    include: {
-      reservas: {
-        where: filtroReserva(consulta.fecha, consulta.horaInicio, consulta.horaFin),
-        include: { solicitud: { select: { id: true, cliente: { select: { nombre: true } } } } }
-      }
-    }
-  });
-
-  const resultado = recursos.map((recurso) => {
-    let motivo = null;
-    if (recurso.estado !== 'disponible') {
-      motivo = `Estado del recurso: ${recurso.estado.replaceAll('_', ' ')}.`;
-    } else if (recurso.reservas.length) {
-      const reserva = recurso.reservas[0];
-      motivo = reserva.solicitud.id === consulta.solicitudId
-        ? 'Ya reservado para este evento.'
-        : `Reservado para el evento #${reserva.solicitud.id} (${reserva.solicitud.cliente.nombre}).`;
-    }
-    return { ...recurso, disponible: motivo === null, motivo };
-  });
-  resultado.sort((a, b) => Number(b.disponible) - Number(a.disponible) || a.nombre.localeCompare(b.nombre, 'es'));
-  return resultado;
-}
-
-export async function reservarRecurso(solicitudId, recursoId) {
-  const evento = await asegurarEventoAbierto(solicitudId);
-  try {
-    const reserva = await prisma.$transaction(async (tx) => {
-      const recurso = await tx.recursoOperativo.findUnique({ where: { id: recursoId } });
-      if (!recurso) throw errorConEstado('Recurso no encontrado.', 404);
-      if (recurso.estado !== 'disponible') {
-        throw errorConEstado(`El recurso no se puede reservar: su estado es ${recurso.estado.replaceAll('_', ' ')}.`, 409);
-      }
-      const conflicto = await tx.reservaRecurso.findFirst({
-        where: {
-          recursoId,
-          ...filtroReserva(textoFecha(evento.fecha), textoHora(evento.horaInicio), textoHora(evento.horaFin))
-        },
-        include: { solicitud: { select: { id: true, cliente: { select: { nombre: true } } } } }
-      });
-      if (conflicto) {
-        if (conflicto.solicitud.id === solicitudId) {
-          throw errorConEstado('El recurso ya está asociado a este evento.', 409);
-        }
-        throw errorConEstado(`El recurso ya está reservado para el evento #${conflicto.solicitud.id} (${conflicto.solicitud.cliente.nombre}).`, 409);
-      }
-      return tx.reservaRecurso.create({ data: { recursoId, solicitudId } });
-    }, { isolationLevel: 'Serializable' });
-    return reserva;
-  } catch (error) {
-    if (error.code === 'P2034') {
-      throw errorConEstado('Otra reserva se guardó al mismo tiempo; vuelve a consultar la disponibilidad.', 409);
-    }
-    if (error.code === 'P2002') {
-      throw errorConEstado('El recurso ya está asociado a este evento.', 409);
-    }
-    throw error;
-  }
 }
 
 export async function devolverRecurso(reservaId) {
