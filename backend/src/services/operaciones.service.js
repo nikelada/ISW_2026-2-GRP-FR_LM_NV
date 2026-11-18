@@ -29,7 +29,7 @@ async function asegurarEventoConfirmado(id) {
   return solicitud;
 }
 
-async function asegurarEventoAbierto(id) {
+export async function asegurarEventoAbierto(id) {
   const solicitud = await asegurarEventoConfirmado(id);
   const cierre = await prisma.cierreEvento.findUnique({ where: { solicitudId: id } });
   if (cierre?.estado === 'aprobado') {

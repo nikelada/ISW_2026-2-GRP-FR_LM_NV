@@ -73,6 +73,7 @@ model Solicitud {
   requerimientosTecnicos String?             @db.Text
   // servicios adicionales (del catálogo)
   servicios              SolicitudServicio[]
+  reservasInventario    ReservaInventario[]
   reservasRecursos       ReservaRecurso[]
   personalAsignado       PersonalEvento[]
   tareas                 TareaEvento[]
@@ -93,12 +94,16 @@ model Solicitud {
 }
 
 model Inventario {
-  id        Int      @id @default(autoincrement())
-  nombre    String   @db.VarChar(150)
-  precio    Decimal  @db.Decimal(10, 2)
-  stock     Int
-  createdAt DateTime @default(now()) @db.Timestamp(6)
-  updatedAt DateTime @updatedAt @db.Timestamp(6)
+  id                 Int                 @id @default(autoincrement())
+  nombre             String              @db.VarChar(150)
+  categoria          String              @default("Sin clasificar") @db.VarChar(100)
+  precio             Decimal             @db.Decimal(10, 2)
+  stock              Int
+  reutilizable       Boolean             @default(false)
+  stockFueraServicio Int                 @default(0)
+  reservas           ReservaInventario[]
+  createdAt          DateTime            @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamp(6)
 
   @@map("inventario")
 }
@@ -310,14 +315,16 @@ enum EstadoCierreEvento {
 }
 
 model RecursoOperativo {
-  id        Int                    @id @default(autoincrement())
-  nombre    String                 @db.VarChar(150)
-  tipo      TipoRecursoOperativo
-  categoria String                 @db.VarChar(100)
-  estado    EstadoRecursoOperativo @default(disponible)
-  reservas  ReservaRecurso[]
-  createdAt DateTime               @default(now()) @db.Timestamp(6)
-  updatedAt DateTime               @updatedAt @db.Timestamp(6)
+  id          Int                    @id @default(autoincrement())
+  nombre      String                 @db.VarChar(150)
+  tipo        TipoRecursoOperativo
+  categoria   String                 @db.VarChar(100)
+  precio      Decimal?               @db.Decimal(10, 2)
+  ubicacion   String?                @db.VarChar(255)
+  estado      EstadoRecursoOperativo @default(disponible)
+  reservas    ReservaRecurso[]
+  createdAt   DateTime               @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime               @updatedAt @db.Timestamp(6)
 
   @@index([tipo, categoria, estado])
   @@map("recursos_operativos")
@@ -335,6 +342,21 @@ model ReservaRecurso {
   @@unique([recursoId, solicitudId])
   @@index([solicitudId])
   @@map("reservas_recursos")
+}
+
+model ReservaInventario {
+  id          Int        @id @default(autoincrement())
+  inventarioId Int
+  solicitudId Int
+  cantidad    Int
+  inventario  Inventario @relation(fields: [inventarioId], references: [id], onDelete: Restrict)
+  solicitud   Solicitud  @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  devueltoEn  DateTime?  @db.Timestamp(6)
+  createdAt   DateTime   @default(now()) @db.Timestamp(6)
+
+  @@index([inventarioId, solicitudId])
+  @@index([solicitudId])
+  @@map("reservas_inventario")
 }
 
 model PersonalEventual {
