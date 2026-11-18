@@ -1,4 +1,4 @@
-// Datos de prueba: clientes, servicios, solicitudes, calendario y cambios.
+// Datos de prueba: clientes, servicios, solicitudes, inventario, recursos y operaciones.
 // Uso normal: npm run seed
 // Uso acumulativo: npm run seed -- --merge
 import { PrismaClient } from '@prisma/client';
@@ -29,6 +29,52 @@ async function obtenerOCrearTipoServicio(data) {
   const existente = await prisma.tipoServicio.findFirst({ where: { nombre: data.nombre } });
   if (existente) return { registro: existente, creado: false };
   return { registro: await prisma.tipoServicio.create({ data }), creado: true };
+}
+
+async function obtenerOCrearInventario(data) {
+  const existente = await prisma.inventario.findFirst({
+    where: { nombre: data.nombre, categoria: data.categoria }
+  });
+  if (existente) return { registro: existente, creado: false };
+  return { registro: await prisma.inventario.create({ data }), creado: true };
+}
+
+async function obtenerOCrearRecursoOperativo(data) {
+  const existente = await prisma.recursoOperativo.findFirst({
+    where: { nombre: data.nombre, tipo: data.tipo }
+  });
+  if (existente) return { registro: existente, creado: false };
+  return { registro: await prisma.recursoOperativo.create({ data }), creado: true };
+}
+
+async function obtenerOCrearPersonalEventual(data) {
+  const existente = await prisma.personalEventual.findFirst({
+    where: { nombre: data.nombre, correo: data.correo }
+  });
+  if (existente) return { registro: existente, creado: false };
+  return { registro: await prisma.personalEventual.create({ data }), creado: true };
+}
+
+async function obtenerOCrearTareaEvento(solicitudId, data) {
+  const existente = await prisma.tareaEvento.findFirst({
+    where: { solicitudId, titulo: data.titulo }
+  });
+  if (existente) return { registro: existente, creado: false };
+  return {
+    registro: await prisma.tareaEvento.create({ data: { solicitudId, ...data } }),
+    creado: true
+  };
+}
+
+async function obtenerOCrearPagoEvento(solicitudId, data) {
+  const existente = await prisma.pagoEvento.findFirst({
+    where: { solicitudId, concepto: data.concepto }
+  });
+  if (existente) return { registro: existente, creado: false };
+  return {
+    registro: await prisma.pagoEvento.create({ data: { solicitudId, ...data } }),
+    creado: true
+  };
 }
 
 async function obtenerOCrearServicio({ tipoServicioId, nombre, descripcion, tipoPrecio, precio }) {
@@ -134,6 +180,66 @@ async function crearSolicitudConServicios(datos, servicios) {
   });
 }
 
+async function crearDatosOperacionesDemo(solicitudId) {
+  const resultado = { personal: 0, asignaciones: 0, tareas: 0, pagos: 0, cierres: 0 };
+  const cierreExistente = await prisma.cierreEvento.findUnique({ where: { solicitudId } });
+  if (cierreExistente && cierreExistente.estado !== 'pendiente') return resultado;
+
+  const trabajadores = [
+    { nombre: 'Sofía Torres (prueba)', telefono: '+56 9 7000 0001', correo: 'sofia.torres@example.com', funcion: 'Coordinación de prueba' },
+    { nombre: 'Matías Riquelme (prueba)', telefono: '+56 9 7000 0002', correo: 'matias.riquelme@example.com', funcion: 'Montaje de salón' },
+    { nombre: 'Valentina Salas (prueba)', telefono: '+56 9 7000 0003', correo: 'valentina.salas@example.com', funcion: 'Sonido e iluminación' },
+    { nombre: 'Diego Paredes (prueba)', telefono: '+56 9 7000 0004', correo: 'diego.paredes@example.com', funcion: 'Apoyo logístico' },
+    { nombre: 'Camila Fuentes (prueba)', telefono: '+56 9 7000 0005', correo: 'camila.fuentes@example.com', funcion: 'Atención de invitados' }
+  ];
+  for (const { funcion, ...datos } of trabajadores) {
+    const personal = await obtenerOCrearPersonalEventual({ ...datos, esContacto: true });
+    if (personal.creado) resultado.personal += 1;
+
+    const asignacionExistente = await prisma.personalEvento.findUnique({
+      where: { solicitudId_personalId: { solicitudId, personalId: personal.registro.id } }
+    });
+    if (!asignacionExistente) {
+      await prisma.personalEvento.create({
+        data: { solicitudId, personalId: personal.registro.id, funcion }
+      });
+      resultado.asignaciones += 1;
+    }
+  }
+
+  const tareas = [
+    { titulo: 'Preparar montaje de prueba', descripcion: 'Revisar mesas y sillas del evento.', estado: 'completada' },
+    { titulo: 'Probar sonido de prueba', descripcion: 'Verificar micrófonos y amplificación.', estado: 'pendiente' }
+  ];
+  for (const datos of tareas) {
+    const tarea = await obtenerOCrearTareaEvento(solicitudId, datos);
+    if (tarea.creado) resultado.tareas += 1;
+  }
+
+  const pagos = [
+    { concepto: 'Abono de prueba', monto: 100000, estado: 'pagado' },
+    { concepto: 'Saldo de prueba', monto: 250000, estado: 'pendiente' }
+  ];
+  for (const datos of pagos) {
+    const pago = await obtenerOCrearPagoEvento(solicitudId, datos);
+    if (pago.creado) resultado.pagos += 1;
+  }
+
+  if (!cierreExistente) {
+    await prisma.cierreEvento.create({
+      data: {
+        solicitudId,
+        estado: 'pendiente',
+        encuestaConforme: true,
+        encuestaComentario: 'Evaluación ficticia para datos de prueba.'
+      }
+    });
+    resultado.cierres += 1;
+  }
+
+  return resultado;
+}
+
 const USUARIO_PRODUCCION = 'Leonardo Araya';
 const USUARIO_GERENCIA = 'Martina Fuentealba';
 const REVISION_COMPLETA = { revisionRecursos: true, revisionAnticipacion: true, revisionCosto: true, revisionOtrosEventos: true };
@@ -192,6 +298,9 @@ async function main() {
   let solicitudesOmitidas = 0;
   let cambiosCreados = 0;
   let tiposEventoCreados = 0;
+  let objetosCreados = 0;
+  let vehiculosCreados = 0;
+  let espaciosCreados = 0;
 
   const datosClientes = [
     { rut: '16234871-K', nombre: 'Camila Rojas', telefono: '+56 9 8123 4567', correo: 'camila.rojas@example.com' },
@@ -262,6 +371,71 @@ async function main() {
       await prisma.tipoEvento.create({ data: { nombre } });
       tiposEventoCreados += 1;
     }
+  const datosInventario = [
+    { nombre: 'Silla plegable de prueba', categoria: 'Mobiliario', precio: 1500, stock: 100, reutilizable: true, stockFueraServicio: 4 },
+    { nombre: 'Mesa plegable de prueba', categoria: 'Mobiliario', precio: 4000, stock: 20, reutilizable: true, stockFueraServicio: 1 },
+    { nombre: 'Micrófono inalámbrico de prueba', categoria: 'Audio', precio: 7000, stock: 6, reutilizable: true, stockFueraServicio: 0 },
+    { nombre: 'Vasos desechables de prueba', categoria: 'Desechables', precio: 100, stock: 200, reutilizable: false, stockFueraServicio: 0 },
+    { nombre: 'Mantel rectangular de prueba', categoria: 'Mobiliario', precio: 2200, stock: 40, reutilizable: true, stockFueraServicio: 3 },
+    { nombre: 'Parlante amplificado de prueba', categoria: 'Audio', precio: 8500, stock: 6, reutilizable: true, stockFueraServicio: 1 },
+    { nombre: 'Proyector portátil de prueba', categoria: 'Audiovisual', precio: 12000, stock: 3, reutilizable: true, stockFueraServicio: 0 },
+    { nombre: 'Extensión eléctrica de prueba', categoria: 'Electricidad', precio: 1200, stock: 12, reutilizable: true, stockFueraServicio: 0 },
+    { nombre: 'Platos desechables de prueba', categoria: 'Desechables', precio: 80, stock: 300, reutilizable: false, stockFueraServicio: 0 }
+  ];
+  for (const datos of datosInventario) {
+    const resultado = await obtenerOCrearInventario(datos);
+    if (resultado.creado) objetosCreados += 1;
+  }
+
+  const datosVehiculos = [
+    { nombre: 'Furgón de carga de prueba', tipo: 'vehiculo', categoria: 'vehiculo', precio: 65000, estado: 'disponible' },
+    { nombre: 'Minibús de prueba', tipo: 'vehiculo', categoria: 'vehiculo', precio: 95000, estado: 'disponible' }
+  ];
+  for (const datos of datosVehiculos) {
+    const resultado = await obtenerOCrearRecursoOperativo(datos);
+    if (resultado.creado) vehiculosCreados += 1;
+  }
+
+  const datosEspacios = [
+    {
+      nombre: 'Salón Norte',
+      tipo: 'espacio',
+      categoria: 'Sin categoría',
+      ubicacion: 'Dirección de prueba 101, Concepción',
+      estado: 'disponible'
+    },
+    {
+      nombre: 'Terraza Sur',
+      tipo: 'espacio',
+      categoria: 'Sin categoría',
+      ubicacion: 'Dirección de prueba 202, Concepción',
+      estado: 'disponible'
+    },
+    {
+      nombre: 'Patio del hotel',
+      tipo: 'espacio',
+      categoria: 'Sin categoría',
+      ubicacion: 'Dirección de prueba 505, Concepción',
+      estado: 'disponible'
+    },
+    {
+      nombre: 'anfiteatro al aire libre',
+      tipo: 'espacio',
+      categoria: 'Sin categoría',
+      ubicacion: 'barros arana, hualpen',
+      estado: 'disponible'
+    },
+    {
+      nombre: 'Playa del lago',
+      tipo: 'espacio',
+      categoria: 'Sin categoría',
+      ubicacion: 'El puente diablo, iquique',
+      estado: 'fuera_servicio'
+    }
+  ];
+  for (const datos of datosEspacios) {
+    const resultado = await obtenerOCrearRecursoOperativo(datos);
+    if (resultado.creado) espaciosCreados += 1;
   }
 
   const firmasExistentes = await obtenerFirmasSolicitudes();
@@ -359,10 +533,27 @@ async function main() {
     cambiosCreados += cambios.length;
   }
 
+  const eventoOperacionesDemo = await prisma.solicitud.findFirst({
+    where: {
+      clienteId: clientes.get('camila.rojas@example.com').id,
+      tipoEvento: 'Matrimonio',
+      estado: 'confirmado'
+    },
+    orderBy: { createdAt: 'desc' }
+  });
+  if (!eventoOperacionesDemo) {
+    throw new Error('No se encontró el evento confirmado de prueba para agregar datos de Operaciones.');
+  }
+  const operacionesDemo = await crearDatosOperacionesDemo(eventoOperacionesDemo.id);
+
   console.log(
-    `Seed completado. Clientes nuevos: ${clientesCreados}; tipos de evento nuevos: ${tiposEventoCreados}; tipos nuevos: ${tiposCreados}; ` +
-      `servicios nuevos: ${serviciosCreados}; solicitudes nuevas: ${solicitudesCreadas}; ` +
-      `cambios nuevos: ${cambiosCreados}; solicitudes omitidas por duplicado: ${solicitudesOmitidas}.`
+    `Seed completado. Clientes nuevos: ${clientesCreados}; tipos nuevos: ${tiposCreados}; ` +
+      `servicios nuevos: ${serviciosCreados}; objetos nuevos: ${objetosCreados}; ` +
+      `vehículos nuevos: ${vehiculosCreados}; espacios nuevos: ${espaciosCreados}; ` +
+      `solicitudes nuevas: ${solicitudesCreadas}; cambios nuevos: ${cambiosCreados}; ` +
+      `personal nuevo: ${operacionesDemo.personal}; asignaciones nuevas: ${operacionesDemo.asignaciones}; ` +
+      `tareas nuevas: ${operacionesDemo.tareas}; pagos nuevos: ${operacionesDemo.pagos}; ` +
+      `cierres nuevos: ${operacionesDemo.cierres}; solicitudes omitidas por duplicado: ${solicitudesOmitidas}.`
   );
 }
 
@@ -372,3 +563,4 @@ main()
     process.exitCode = 1;
   })
   .finally(() => prisma.$disconnect());
+}
