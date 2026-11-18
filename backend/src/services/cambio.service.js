@@ -1,7 +1,7 @@
 import { prisma } from '../config/prisma.js';
 import { crearConCodigo } from '../utils/codigo.js';
 import { asegurarFechaLibre, buscarConflictos } from './calendario.service.js';
-import { aFecha, aHora, asegurarFechaNoPasada, obtenerPorId as obtenerEvento } from './solicitud.service.js';
+import { aFecha, aHora, asegurarFechaNoPasada, lugarDeEspacio, obtenerPorId as obtenerEvento } from './solicitud.service.js';
 import { asegurarTipoEvento } from './tipoEvento.service.js';
 
 const FACTORES = ['revisionRecursos', 'revisionAnticipacion', 'revisionCosto', 'revisionOtrosEventos'];
@@ -46,13 +46,15 @@ export async function listar({ estado, solicitudId } = {}) {
   if (estado && !ESTADOS.includes(estado)) throw httpError(400, 'Estado de cambio inválido.');
   const cambios = await prisma.solicitudCambio.findMany({
     where: { estado: estado || undefined, solicitudId: solicitudId || undefined },
+    include: { historial: true },
     orderBy: { createdAt: 'desc' }
   });
   return Promise.all(cambios.map(conDetalle));
 }
 
+// Con su historial, para mostrar el valor que tenía antes de aplicarse
 export async function obtenerPorId(id) {
-  const cambio = await prisma.solicitudCambio.findUnique({ where: { id } });
+  const cambio = await prisma.solicitudCambio.findUnique({ where: { id }, include: { historial: true } });
   if (!cambio) throw httpError(404, 'Cambio no encontrado.');
   return conDetalle(cambio);
 }
@@ -63,6 +65,9 @@ export async function registrar({ solicitudId, cambios, motivo }, usuario) {
   if (evento.estado !== 'confirmado') {
     throw httpError(409, 'Solo los eventos confirmados se modifican con una solicitud de cambio; la solicitud aún puede editarse directamente.');
   }
+  // Si es un espacio, el lugar es su nombre
+  if (cambios.espacioId) cambios = { ...cambios, lugar: await lugarDeEspacio(cambios.espacioId) };
+  else if ('espacioId' in cambios && !cambios.lugar) throw httpError(400, 'Revisa los datos del cambio.', { errores: { lugar: 'Indica el nuevo lugar.' } });
   const distintos = Object.fromEntries(Object.entries(cambios).filter(([campo, valor]) => evento[campo] !== valor));
   if (!Object.keys(distintos).length) throw httpError(400, 'Los nuevos valores son iguales a los actuales.');
   asegurarFechaNoPasada(distintos.fecha);
@@ -113,13 +118,15 @@ export async function aplicar(id, usuario) {
   if (cambiaHorario(cambio.cambios)) await asegurarFechaLibre(nuevo);
 
   const campos = Object.keys(cambio.cambios);
+  // El id del espacio no va al historial, ahí basta con el lugar
+  const camposHistorial = campos.filter((campo) => campo !== 'espacioId');
   await prisma.$transaction([
     prisma.solicitud.update({
       where: { id: evento.id },
       data: Object.fromEntries(campos.map((campo) => [campo, aColumna(campo, cambio.cambios[campo])]))
     }),
     prisma.historialEvento.createMany({
-      data: campos.map((campo) => ({
+      data: camposHistorial.map((campo) => ({
         solicitudId: evento.id,
         cambioId: id,
         campo,
@@ -131,14 +138,4 @@ export async function aplicar(id, usuario) {
     prisma.solicitudCambio.update({ where: { id }, data: { aplicadoPor: usuario.name, aplicadoEn: new Date() } })
   ]);
   return obtenerPorId(id);
-}
-
-// Historial de lo que se le ha cambiado a un evento
-export async function historialDeEvento(solicitudId) {
-  await obtenerEvento(solicitudId);
-  return prisma.historialEvento.findMany({
-    where: { solicitudId },
-    include: { cambio: { select: { id: true, codigo: true, motivo: true, revisadoPor: true, revisadoEn: true } } },
-    orderBy: { createdAt: 'desc' }
-  });
 }

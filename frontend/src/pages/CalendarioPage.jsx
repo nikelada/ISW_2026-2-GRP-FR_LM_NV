@@ -95,7 +95,7 @@ export default function CalendarioPage({ user }) {
 
   return (
     <>
-      <EncabezadoPagina antetitulo="Calendario compartido" titulo="Calendario de eventos" descripcion="Eventos registrados por fecha y horario. Solo los eventos con fecha confirmada generan conflicto.">
+      <EncabezadoPagina antetitulo="Calendario compartido" titulo="Calendario de eventos" descripcion="Eventos registrados por fecha y horario. Aquí se consulta si un horario está libre; solo los eventos con fecha confirmada generan conflicto.">
         <div className="flex gap-2 max-lg:hidden">
           <span className={`${CHIP} ${chipEstado('confirmado')} text-[11px]!`}>Fecha confirmada</span>
           <span className={`${CHIP} ${chipEstado('pendiente')} text-[11px]!`}>Solicitud sin confirmar</span>
@@ -155,7 +155,7 @@ export default function CalendarioPage({ user }) {
                     <div><EstadoBadge estado={evento.estado} fechaHabilitada={evento.fechaHabilitada} /></div>
                   </div>
                   {/* Gerencia no tiene la sección Solicitudes */}
-                  {esProduccion(user) && <a className="text-sm font-semibold text-teal-700 hover:underline" href={`#/solicitudes?id=${evento.id}`}>Ver</a>}
+                  {esProduccion(user) && <a className="whitespace-nowrap text-sm font-semibold text-teal-700 hover:underline" href={`#/solicitudes?id=${evento.id}`}>Ver solicitud</a>}
                 </li>
               ))}
             </ul>
@@ -163,8 +163,9 @@ export default function CalendarioPage({ user }) {
             <Vacio>No hay eventos registrados en esta fecha.</Vacio>
           )}
 
-          <form className="grid gap-4 border-t border-stone-200 pt-4" aria-label="Revisar disponibilidad" onSubmit={consultar}>
-            <Antetitulo>Revisar disponibilidad</Antetitulo>
+          <form className="grid gap-4 border-t border-stone-200 pt-4" aria-label="Consultar un horario" onSubmit={consultar}>
+            <Antetitulo>Consultar un horario</Antetitulo>
+            <p className="-mt-2 text-xs text-stone-500">Solo consulta, no guarda nada. La fecha de una solicitud se habilita desde la misma solicitud.</p>
             <Campo etiqueta="Fecha"><input type="date" name="fecha" required value={consulta.fecha} onChange={(e) => setConsulta({ ...consulta, fecha: e.target.value })} /></Campo>
             <div className="grid grid-cols-2 gap-3">
               <Campo etiqueta="Hora de inicio"><input type="time" name="horaInicio" required value={consulta.horaInicio} onChange={(e) => setConsulta({ ...consulta, horaInicio: e.target.value })} /></Campo>

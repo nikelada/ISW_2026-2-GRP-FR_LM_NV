@@ -41,11 +41,3 @@ export async function aplicar(req, res, next) {
     next(error);
   }
 }
-
-export async function historial(req, res, next) {
-  try {
-    res.json(await cambioService.historialDeEvento(req.params.id));
-  } catch (error) {
-    next(error);
-  }
-}

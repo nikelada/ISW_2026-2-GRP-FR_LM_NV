@@ -20,6 +20,7 @@ const CAMPOS_OBLIGATORIOS = [
 const ESTADOS = ['pendiente', 'registrada', 'confirmado'];
 export const INCLUIR_SOLICITUD = {
   cliente: { select: { id: true, nombre: true } },
+  espacio: true,
   servicios: {
     include: {
       servicio: { include: INCLUIR_SERVICIO },
@@ -87,9 +88,22 @@ function aDatos(datos, servicios = []) {
     horaFin: aHora(datos.horaFin),
     cantidadPersonas: datos.cantidadPersonas,
     lugar: datos.lugar,
+    espacioId: datos.espacioId,
     requerimientosTecnicos: datos.requerimientosTecnicos,
     estado: calcularEstado({ ...datos, servicios })
   };
+}
+
+// El espacio tiene que existir y no estar fuera de servicio
+export async function lugarDeEspacio(espacioId) {
+  const espacio = await prisma.recursoOperativo.findUnique({ where: { id: espacioId } });
+  if (!espacio || espacio.tipo !== 'espacio' || espacio.estado === 'fuera_servicio') {
+    throw Object.assign(new Error('El lugar elegido no está disponible.'), {
+      status: 400,
+      detalles: { errores: { lugar: 'Elige otro lugar de la lista.' } }
+    });
+  }
+  return espacio.nombre;
 }
 
 // El cliente de la solicitud tiene que estar registrado
@@ -132,6 +146,7 @@ export async function crear(datos) {
   asegurarFechaNoPasada(datos.fecha);
   await asegurarClienteRegistrado(datos.clienteId);
   await asegurarTipoEvento(datos.tipoEvento);
+  if (datos.espacioId) datos.lugar = await lugarDeEspacio(datos.espacioId);
   const creada = await crearConCodigo(prisma.solicitud, 'SOL', { data: aDatos(datos), include: INCLUIR_SOLICITUD });
   return aRespuesta(creada);
 }
@@ -146,6 +161,7 @@ export async function actualizar(id, datos) {
   if (datos.fecha !== actual.fecha) asegurarFechaNoPasada(datos.fecha);
   if (datos.clienteId !== actual.clienteId) await asegurarClienteRegistrado(datos.clienteId);
   if (datos.tipoEvento !== actual.tipoEvento) await asegurarTipoEvento(datos.tipoEvento);
+  if (datos.espacioId) datos.lugar = datos.espacioId === actual.espacioId ? actual.lugar : await lugarDeEspacio(datos.espacioId);
 
   const data = aDatos(datos, actual.servicios);
   // Si cambió la fecha u hora hay que volver a revisar la disponibilidad

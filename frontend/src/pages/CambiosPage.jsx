@@ -3,6 +3,7 @@ import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoCambio, { ESTADOS_CAMBIO } from '../components/EstadoCambio.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
+import SelectorLugar from '../components/SelectorLugar.jsx';
 import SelectorTipoEvento from '../components/SelectorTipoEvento.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
@@ -14,7 +15,7 @@ import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
 import * as cambioService from '../services/cambioService.js';
 import * as solicitudService from '../services/solicitudService.js';
-import { CAMPOS_EVENTO, etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
+import { CAMPOS_EVENTO, camposCambiados, etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
 import { fechaMinima, formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esGerencia, esProduccion } from '../utils/roles.js';
 
@@ -70,7 +71,7 @@ const columnas = [
       </>
     )
   },
-  { campo: 'cambios', titulo: 'Datos a cambiar', render: (c) => Object.keys(c.cambios).map(etiquetaCampo).join(', ') },
+  { campo: 'cambios', titulo: 'Datos a cambiar', render: (c) => camposCambiados(c.cambios).map(etiquetaCampo).join(', ') },
   { campo: 'estado', titulo: 'Estado', render: (c) => <EstadoCambio cambio={c} /> }
 ];
 
@@ -101,7 +102,7 @@ export default function CambiosPage({ user, params }) {
 
   return (
     <>
-      <EncabezadoPagina antetitulo="Eventos confirmados" titulo="Cambios solicitados" descripcion="Cambios pedidos por los clientes: Gerencia los aprueba o rechaza y Producción y Comercial aplica solo lo aprobado.">
+      <EncabezadoPagina antetitulo="Eventos confirmados" titulo="Cambios solicitados" descripcion="Cambios que piden los clientes a eventos ya confirmados: Producción y Comercial los registra, Gerencia los aprueba o rechaza y después se aplica solo lo aprobado. Si la solicitud aún no está confirmada, se edita en Solicitudes.">
         {produccion && (
           <Boton onClick={() => { setNuevo(true); setSeleccionadoId(null); setAviso(null); }}>
             <span>Registrar cambio</span><span aria-hidden="true">+</span>
@@ -153,7 +154,7 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
   // Al elegir el evento se cargan sus valores actuales
   useEffect(() => {
     if (!evento) return;
-    setValores(Object.fromEntries(CAMPOS_EVENTO.map(({ campo }) => [campo, evento[campo] ?? ''])));
+    setValores({ ...Object.fromEntries(CAMPOS_EVENTO.map(({ campo }) => [campo, evento[campo] ?? ''])), espacioId: evento.espacioId ?? '' });
     setSeleccion({});
   }, [evento]);
 
@@ -162,6 +163,7 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
     setError('');
     setErrores({});
     const cambios = Object.fromEntries(Object.keys(seleccion).filter((campo) => seleccion[campo]).map((campo) => [campo, valores[campo]]));
+    if (seleccion.lugar) cambios.espacioId = valores.espacioId || null;
     try {
       onRegistrado(await cambioService.registrar({ solicitudId: Number(eventoId), cambios, motivo }));
     } catch (e) {
@@ -182,6 +184,7 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
             {eventos.map((e) => <option key={e.id} value={e.id}>{e.cliente.nombre} · {formatearFecha(e.fecha)} · {formatearHorario(e)}</option>)}
           </select>
         </Campo>
+        <p className="text-xs text-stone-500">Solo aparecen eventos confirmados. Las solicitudes sin confirmar se editan en Solicitudes.</p>
         {evento && (
           <>
             <p className="text-xs text-stone-500">Marca los datos que el cliente quiere cambiar e indica el nuevo valor.</p>
@@ -191,10 +194,13 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
                   <input type="checkbox" name={`cambiar-${campo}`} checked={!!seleccion[campo]} onChange={(e) => setSeleccion({ ...seleccion, [campo]: e.target.checked })} />
                   <span>{etiqueta}</span>
                 </label>
-                {seleccion[campo] && tipo === 'lista' && (
+                {seleccion[campo] && tipo === 'tipoEvento' && (
                   <SelectorTipoEvento name={campo} error={errores[campo]} value={valores[campo]} onChange={(valor) => setValores((actual) => ({ ...actual, [campo]: valor }))} />
                 )}
-                {seleccion[campo] && tipo !== 'lista' && (
+                {seleccion[campo] && tipo === 'lugar' && (
+                  <SelectorLugar error={errores[campo]} espacioId={valores.espacioId} lugar={valores.lugar} onChange={(valor) => setValores((actual) => ({ ...actual, ...valor }))} />
+                )}
+                {seleccion[campo] && !['tipoEvento', 'lugar'].includes(tipo) && (
                   <Campo error={errores[campo]}>
                     {tipo === 'textarea'
                       ? <textarea name={campo} value={valores[campo]} onChange={(e) => setValores({ ...valores, [campo]: e.target.value })} />
@@ -223,6 +229,8 @@ function DetalleCambio({ cambio, aviso, gerencia, produccion, onTerminar }) {
   const [resultado, setResultado] = useState(null);
   const todosRevisados = FACTORES.every(({ clave }) => factores[clave]);
   const { evento } = cambio;
+  // Lo que tenía el evento antes de aplicar el cambio
+  const antes = Object.fromEntries((cambio.historial || []).map((h) => [h.campo, h.valorAnterior]));
 
   async function revisar(decision) {
     setError('');
@@ -261,15 +269,15 @@ function DetalleCambio({ cambio, aviso, gerencia, produccion, onTerminar }) {
         <thead className="text-[11px] uppercase tracking-wide text-stone-500">
           <tr>
             <th className={celda}>Dato</th>
-            {!cambio.aplicadoEn && <th className={celda}>Actual</th>}
+            <th className={celda}>{cambio.aplicadoEn ? 'Antes' : 'Actual'}</th>
             <th className={celda}>{cambio.aplicadoEn ? 'Aplicado' : cambio.estado === 'pendiente' ? 'Propuesto' : 'Solicitado'}</th>
           </tr>
         </thead>
         <tbody>
-          {Object.entries(cambio.cambios).map(([campo, valor]) => (
+          {camposCambiados(cambio.cambios).map((campo) => [campo, cambio.cambios[campo]]).map(([campo, valor]) => (
             <tr key={campo}>
               <td className={celda}>{etiquetaCampo(campo)}</td>
-              {!cambio.aplicadoEn && <td className={celda}>{formatearValor(campo, evento[campo])}</td>}
+              <td className={celda}>{formatearValor(campo, cambio.aplicadoEn ? antes[campo] : evento[campo])}</td>
               <td className={`${celda} font-semibold`}>{formatearValor(campo, valor)}</td>
             </tr>
           ))}
