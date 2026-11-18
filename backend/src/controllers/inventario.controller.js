@@ -61,6 +61,14 @@ export async function reservar(req, res, next) {
   }
 }
 
+export async function reducirReserva(req, res, next) {
+  try {
+    res.json(await inventarioService.reducirReserva(req.reserva.solicitudId, req.params.id, req.reserva.cantidad));
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function devolver(req, res, next) {
   try {
     res.json(await inventarioService.devolver(req.params.id));

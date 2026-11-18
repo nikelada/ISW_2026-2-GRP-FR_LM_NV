@@ -50,6 +50,16 @@ export function validarReservaInventario(req, res, next) {
   next();
 }
 
+export function validarReducirReservaInventario(req, res, next) {
+  const solicitudId = Number(req.body.solicitudId);
+  const cantidad = req.body.cantidad === undefined ? 1 : Number(req.body.cantidad);
+  if (!Number.isInteger(solicitudId) || solicitudId <= 0 || !Number.isInteger(cantidad) || cantidad <= 0) {
+    return res.status(400).json({ message: 'Indica un evento y una cantidad válida para reducir la reserva.' });
+  }
+  req.reserva = { solicitudId, cantidad };
+  next();
+}
+
 export function validarReservaVehiculo(req, res, next) {
   const solicitudId = Number(req.body.solicitudId);
   if (!Number.isInteger(solicitudId) || solicitudId <= 0) {

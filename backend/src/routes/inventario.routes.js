@@ -6,6 +6,7 @@ import { validarId } from '../middlewares/id.middleware.js';
 import {
   validarConsultaDisponibilidad,
   validarInventario,
+  validarReducirReservaInventario,
   validarReservaInventario,
   validarReservaVehiculo,
   validarVehiculo
@@ -15,6 +16,7 @@ const router = Router();
 router.use(requireAuth);
 router.get('/disponibilidad', autorizarRol(ROLES_GERENCIA), validarConsultaDisponibilidad, inventarioController.consultarDisponibilidad);
 router.post('/:id/reservas', autorizarRol(ROLES_GERENCIA), validarId, validarReservaInventario, inventarioController.reservar);
+router.patch('/:id/reservas/reducir', autorizarRol(ROLES_GERENCIA), validarId, validarReducirReservaInventario, inventarioController.reducirReserva);
 router.patch('/reservas/:id/devolucion', autorizarRol(ROLES_ADMIN), validarId, inventarioController.devolver);
 router.get('/vehiculos', autorizarRol(ROLES_GERENCIA), inventarioController.listarVehiculos);
 router.post('/vehiculos/:id/reservas', autorizarRol(ROLES_GERENCIA), validarId, validarReservaVehiculo, inventarioController.reservarVehiculo);

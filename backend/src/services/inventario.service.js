@@ -186,6 +186,49 @@ export async function reservar(solicitudId, inventarioId, cantidad) {
   }
 }
 
+export async function reducirReserva(solicitudId, inventarioId, cantidad = 1) {
+  await asegurarEventoAbierto(solicitudId);
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const item = await tx.inventario.findUnique({
+        where: { id: inventarioId },
+        select: { id: true }
+      });
+      if (!item) throw errorConEstado('Producto de inventario no encontrado.', 404);
+
+      const reservas = await tx.reservaInventario.findMany({
+        where: { inventarioId, solicitudId, devueltoEn: null },
+        orderBy: [{ createdAt: 'desc' }, { id: 'desc' }]
+      });
+      const stockReservado = reservas.reduce((total, reserva) => total + reserva.cantidad, 0);
+      if (stockReservado < cantidad) {
+        throw errorConEstado('No hay suficientes unidades reservadas de este objeto para el evento.', 409);
+      }
+
+      let restante = cantidad;
+      for (const reserva of reservas) {
+        if (restante === 0) break;
+        const cantidadAReducir = Math.min(reserva.cantidad, restante);
+        if (cantidadAReducir === reserva.cantidad) {
+          await tx.reservaInventario.delete({ where: { id: reserva.id } });
+        } else {
+          await tx.reservaInventario.update({
+            where: { id: reserva.id },
+            data: { cantidad: reserva.cantidad - cantidadAReducir }
+          });
+        }
+        restante -= cantidadAReducir;
+      }
+      return { inventarioId, solicitudId, cantidadReducida: cantidad, stockReservado: stockReservado - cantidad };
+    }, { isolationLevel: 'Serializable' });
+  } catch (error) {
+    if (error.code === 'P2034') {
+      throw errorConEstado('La reserva cambió durante el ajuste; vuelve a intentarlo.', 409);
+    }
+    throw error;
+  }
+}
+
 export async function devolver(reservaId) {
   const reserva = await prisma.reservaInventario.findUnique({
     where: { id: reservaId },

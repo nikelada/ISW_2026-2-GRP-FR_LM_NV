@@ -49,7 +49,6 @@ export default function InventarioPage({ user }) {
   const [objetoForm, setObjetoForm] = useState(OBJETO_VACIO);
   const [vehiculoEditando, setVehiculoEditando] = useState(null);
   const [vehiculoForm, setVehiculoForm] = useState(VEHICULO_VACIO);
-  const [cantidades, setCantidades] = useState({});
   const [aviso, setAviso] = useState(null);
   const [guardando, setGuardando] = useState(false);
 
@@ -129,12 +128,18 @@ export default function InventarioPage({ user }) {
     if (eliminada && objetoEditando?.id === item.id) cancelarObjeto();
   }
 
-  async function reservarObjeto(event, item) {
-    event.preventDefault();
-    const cantidad = Number(cantidades[item.id] || 1);
+  async function ajustarReservaObjeto(item, delta) {
+    const reducir = delta < 0;
+    const cantidad = Math.abs(delta);
+    const unidades = cantidad === 1 ? 'una unidad' : `${cantidad} unidades`;
+    const verbo = reducir
+      ? cantidad === 1 ? 'Se quitó' : 'Se quitaron'
+      : cantidad === 1 ? 'Se agregó' : 'Se agregaron';
     await ejecutar(
-      () => inventarioService.reservar(item.id, Number(solicitudId), cantidad),
-      `${cantidad} unidad(es) de «${item.nombre}» reservadas para el evento.`,
+      () => reducir
+        ? inventarioService.reducirReserva(item.id, Number(solicitudId), cantidad)
+        : inventarioService.reservar(item.id, Number(solicitudId), cantidad),
+      `${verbo} ${unidades} de «${item.nombre}» ${reducir ? 'de' : 'a'} la reserva.`,
       [disponibilidadObjetos.recargar, inventarioFetch.recargar]
     );
   }
@@ -299,19 +304,48 @@ export default function InventarioPage({ user }) {
                               <div className="flex flex-wrap gap-2">
                                 {puedeEditar && <Boton variante="enlace" onClick={() => editarObjeto(item)}>Editar</Boton>}
                                 {puedeEditar && <Boton variante="enlace" onClick={() => eliminarObjeto(item)}>Eliminar</Boton>}
-                                {solicitudId && !eventoCerrado && item.stockDisponible > 0 && (
-                                  <form className="flex items-center gap-2" onSubmit={(event) => reservarObjeto(event, item)}>
-                                    <input
-                                      aria-label={`Cantidad de ${item.nombre}`}
-                                      className="w-16 rounded border border-stone-300 px-2 py-1"
-                                      type="number"
-                                      min="1"
-                                      max={item.stockDisponible}
-                                      value={cantidades[item.id] || 1}
-                                      onChange={(event) => setCantidades({ ...cantidades, [item.id]: event.target.value })}
-                                    />
-                                    <Boton type="submit" className="px-3 py-1.5" disabled={guardando}>Reservar</Boton>
-                                  </form>
+                                {solicitudId && !eventoCerrado && (item.stockDisponible > 0 || item.stockReservado > 0) && (
+                                  <div className="flex items-center gap-2" role="group" aria-label={`Reservas de ${item.nombre}`}>
+                                    <Boton
+                                      variante="secundario"
+                                      className="px-2! py-1.5!"
+                                      aria-label={`Quitar 10 unidades de ${item.nombre}`}
+                                      disabled={guardando || item.stockReservado < 10}
+                                      onClick={() => ajustarReservaObjeto(item, -10)}
+                                    >
+                                      −10
+                                    </Boton>
+                                    <Boton
+                                      variante="secundario"
+                                      className="px-2! py-1.5!"
+                                      aria-label={`Quitar una unidad de ${item.nombre}`}
+                                      disabled={guardando || item.stockReservado <= 0}
+                                      onClick={() => ajustarReservaObjeto(item, -1)}
+                                    >
+                                      −
+                                    </Boton>
+                                    <span className="min-w-5 text-center font-semibold" aria-live="polite">
+                                      {item.stockReservado}
+                                    </span>
+                                    <Boton
+                                      variante="secundario"
+                                      className="px-2! py-1.5!"
+                                      aria-label={`Agregar una unidad de ${item.nombre}`}
+                                      disabled={guardando || item.stockDisponible <= 0}
+                                      onClick={() => ajustarReservaObjeto(item, 1)}
+                                    >
+                                      +
+                                    </Boton>
+                                    <Boton
+                                      variante="secundario"
+                                      className="px-2! py-1.5!"
+                                      aria-label={`Agregar 10 unidades de ${item.nombre}`}
+                                      disabled={guardando || item.stockDisponible < 10}
+                                      onClick={() => ajustarReservaObjeto(item, 10)}
+                                    >
+                                      +10
+                                    </Boton>
+                                  </div>
                                 )}
                               </div>
                             </td>

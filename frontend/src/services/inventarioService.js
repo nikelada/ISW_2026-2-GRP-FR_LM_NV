@@ -8,6 +8,8 @@ export const consultarDisponibilidad = (solicitudId) =>
   api.get(`/inventario/disponibilidad?${new URLSearchParams({ solicitudId })}`);
 export const reservar = (inventarioId, solicitudId, cantidad) =>
   api.post(`/inventario/${inventarioId}/reservas`, { solicitudId, cantidad });
+export const reducirReserva = (inventarioId, solicitudId, cantidad = 1) =>
+  api.patch(`/inventario/${inventarioId}/reservas/reducir`, { solicitudId, cantidad });
 export const devolverReserva = (reservaId) =>
   api.patch(`/inventario/reservas/${reservaId}/devolucion`);
 export const listarVehiculos = () => api.get('/inventario/vehiculos');
