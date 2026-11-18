@@ -12,6 +12,8 @@ export const reducirReserva = (inventarioId, solicitudId, cantidad = 1) =>
   api.patch(`/inventario/${inventarioId}/reservas/reducir`, { solicitudId, cantidad });
 export const devolverReserva = (reservaId) =>
   api.patch(`/inventario/reservas/${reservaId}/devolucion`);
+export const devolverReservasGrupo = (solicitudId, inventarioId) =>
+  api.patch('/inventario/reservas/devolucion-grupo', { solicitudId, inventarioId });
 export const listarVehiculos = () => api.get('/inventario/vehiculos');
 export const crearVehiculo = (datos) => api.post('/inventario/vehiculos', datos);
 export const actualizarVehiculo = (id, datos) => api.put(`/inventario/vehiculos/${id}`, datos);

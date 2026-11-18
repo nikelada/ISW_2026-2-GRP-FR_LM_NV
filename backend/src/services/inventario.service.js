@@ -246,6 +246,24 @@ export async function devolver(reservaId) {
   });
 }
 
+export async function devolverGrupo(solicitudId, inventarioId) {
+  await asegurarEventoAbierto(solicitudId);
+  const item = await prisma.inventario.findUnique({
+    where: { id: inventarioId },
+    select: { id: true, reutilizable: true }
+  });
+  if (!item) throw errorConEstado('Producto de inventario no encontrado.', 404);
+  if (!item.reutilizable) {
+    throw errorConEstado('Los objetos no reutilizables se descuentan al reservar y no se devuelven.', 409);
+  }
+
+  const resultado = await prisma.reservaInventario.updateMany({
+    where: { solicitudId, inventarioId, devueltoEn: null },
+    data: { devueltoEn: new Date() }
+  });
+  return { solicitudId, inventarioId, reservasActualizadas: resultado.count };
+}
+
 export async function listarVehiculos() {
   const vehiculos = await prisma.recursoOperativo.findMany({
     where: { tipo: 'vehiculo' },

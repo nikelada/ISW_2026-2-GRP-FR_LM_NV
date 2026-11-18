@@ -43,6 +43,21 @@ function ListaEstado({ titulo, elementos, campoEstado, alCambiar, textoVacio, de
   );
 }
 
+function agruparReservasInventario(reservas = []) {
+  const grupos = new Map();
+  for (const reserva of reservas) {
+    const inventarioId = reserva.inventario.id;
+    let grupo = grupos.get(inventarioId);
+    if (!grupo) {
+      grupo = { inventario: reserva.inventario, cantidad: 0, reservas: [] };
+      grupos.set(inventarioId, grupo);
+    }
+    grupo.cantidad += reserva.cantidad;
+    grupo.reservas.push(reserva);
+  }
+  return [...grupos.values()];
+}
+
 export default function OperacionesPage({ user }) {
   const esAdmin = user?.role === 'admin';
   const puedeAprobar = ['manager', 'admin'].includes(user?.role);
@@ -102,6 +117,7 @@ export default function OperacionesPage({ user }) {
       #{item.id} · {item.cliente.nombre} · {item.fecha} {item.horaInicio}-{item.horaFin}
     </option>
   ));
+  const objetosAgrupados = agruparReservasInventario(evento?.reservasInventario);
 
   return (
     <>
@@ -151,31 +167,41 @@ export default function OperacionesPage({ user }) {
                 ))}
               </ul>
             )}
-            <ListaEstado
-              titulo="Objetos reservados desde Inventario"
-              elementos={evento.reservasInventario}
-              textoVacio="Este evento no tiene objetos reservados."
-            />
-            {evento.reservasInventario.some((reserva) => reserva.inventario.reutilizable && !reserva.devueltoEn) && (
-              <ul className="mt-2 grid gap-2">
-                {evento.reservasInventario
-                  .filter((reserva) => reserva.inventario.reutilizable && !reserva.devueltoEn)
-                  .map((reserva) => (
-                    <li key={reserva.id} className="flex items-center justify-between rounded border border-stone-200 p-3 text-sm">
-                      <span>{reserva.inventario.nombre} · {reserva.cantidad} unidad(es)</span>
-                      {esAdmin && !cerrado && (
-                        <Boton
-                          variante="secundario"
-                          disabled={ocupado}
-                          onClick={() => ejecutar(() => inventarioService.devolverReserva(reserva.id), 'Devolución de objetos registrada.')}
-                        >
-                          Marcar devuelto
-                        </Boton>
-                      )}
-                    </li>
-                  ))}
-              </ul>
-            )}
+            <section className="mt-4 grid gap-2">
+              <h3 className="font-bold">Objetos reservados desde Inventario</h3>
+              {objetosAgrupados.length === 0 ? (
+                <p className="text-sm text-stone-500">Este evento no tiene objetos reservados.</p>
+              ) : (
+                <ul className="grid gap-2">
+                  {objetosAgrupados.map((grupo) => {
+                    const tieneDevolucionesPendientes = grupo.inventario.reutilizable
+                      && grupo.reservas.some((reserva) => !reserva.devueltoEn);
+                    return (
+                      <li key={grupo.inventario.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-stone-200 p-3 text-sm">
+                        <span>
+                          <strong>{grupo.inventario.nombre}</strong>
+                          <span className="ml-2 text-stone-600">· {grupo.cantidad} unidad(es)</span>
+                          {!grupo.inventario.reutilizable && <span className="ml-2 text-stone-500">· consumido</span>}
+                          {grupo.inventario.reutilizable && !tieneDevolucionesPendientes && <span className="ml-2 text-stone-500">· devuelto</span>}
+                        </span>
+                        {esAdmin && !cerrado && tieneDevolucionesPendientes && (
+                          <Boton
+                            variante="secundario"
+                            disabled={ocupado}
+                            onClick={() => ejecutar(
+                              () => inventarioService.devolverReservasGrupo(evento.id, grupo.inventario.id),
+                              `Devolución de «${grupo.inventario.nombre}» registrada.`
+                            )}
+                          >
+                            Marcar devuelto
+                          </Boton>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+            </section>
 
             {esAdmin && !cerrado && (
               <div className="mt-6 grid gap-6 border-t border-stone-200 pt-5 lg:grid-cols-2">

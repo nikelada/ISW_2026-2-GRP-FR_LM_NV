@@ -60,6 +60,16 @@ export function validarReducirReservaInventario(req, res, next) {
   next();
 }
 
+export function validarDevolucionGrupoInventario(req, res, next) {
+  const solicitudId = Number(req.body.solicitudId);
+  const inventarioId = Number(req.body.inventarioId);
+  if (!Number.isInteger(solicitudId) || solicitudId <= 0 || !Number.isInteger(inventarioId) || inventarioId <= 0) {
+    return res.status(400).json({ message: 'Indica un evento y un objeto válidos para registrar la devolución.' });
+  }
+  req.reserva = { solicitudId, inventarioId };
+  next();
+}
+
 export function validarReservaVehiculo(req, res, next) {
   const solicitudId = Number(req.body.solicitudId);
   if (!Number.isInteger(solicitudId) || solicitudId <= 0) {

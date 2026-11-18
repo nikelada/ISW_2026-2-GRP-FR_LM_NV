@@ -77,6 +77,14 @@ export async function devolver(req, res, next) {
   }
 }
 
+export async function devolverGrupo(req, res, next) {
+  try {
+    res.json(await inventarioService.devolverGrupo(req.reserva.solicitudId, req.reserva.inventarioId));
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function listarVehiculos(_req, res, next) {
   try {
     res.json(await inventarioService.listarVehiculos());
