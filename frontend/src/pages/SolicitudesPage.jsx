@@ -4,6 +4,7 @@ import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoBadge from '../components/EstadoBadge.jsx';
 import ListaCambios from '../components/ListaCambios.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
+import SelectorLugar, { textoEspacio } from '../components/SelectorLugar.jsx';
 import SelectorTipoEvento from '../components/SelectorTipoEvento.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
@@ -21,7 +22,7 @@ import * as servicioService from '../services/servicioService.js';
 import { fechaMinima, formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
-const VACIO = { clienteId: '', tipoEvento: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '', requerimientosTecnicos: '' };
+const VACIO = { clienteId: '', tipoEvento: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '', espacioId: '', requerimientosTecnicos: '' };
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
   style: 'currency',
@@ -288,7 +289,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
                   <Campo etiqueta="Hora de término" error={errores.horaFin}><input type="time" {...campo('horaFin')} /></Campo>
                 </div>
                 <Campo etiqueta="Cantidad de personas" error={errores.cantidadPersonas}><input type="number" min="1" step="1" {...campo('cantidadPersonas')} /></Campo>
-                <Campo etiqueta="Lugar" error={errores.lugar}><input type="text" maxLength={255} {...campo('lugar')} /></Campo>
+                <SelectorLugar key={seleccionada?.id ?? 'nueva'} etiqueta="Lugar" error={errores.lugar} espacioId={form.espacioId} lugar={form.lugar} onChange={(valor) => setForm((actual) => ({ ...actual, ...valor }))} />
                 <Campo etiqueta="Requerimientos técnicos" error={errores.requerimientosTecnicos}><textarea rows={3} maxLength={2000} {...campo('requerimientosTecnicos')} /></Campo>
                 <p className="text-xs text-stone-500">El cliente es obligatorio. Los servicios adicionales se asocian después de guardar la solicitud. Si falta algún otro dato, la solicitud quedará pendiente hasta completarla.</p>
                 <div className="flex gap-2.5">
@@ -371,7 +372,7 @@ function DetalleSolicitud({
         ['Fecha', s.fecha ? formatearFecha(s.fecha) : '—'],
         ['Horario', formatearHorario(s) || '—'],
         ['Cantidad de personas', s.cantidadPersonas ?? '—'],
-        ['Lugar', s.lugar || '—'],
+        ['Lugar', s.espacio ? textoEspacio(s.espacio) : s.lugar || '—'],
         ['Requerimientos técnicos', s.requerimientosTecnicos || '—']
       ]} />
       <div className="mb-4 border-t border-stone-200 pt-4">

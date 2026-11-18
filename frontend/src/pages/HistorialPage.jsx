@@ -3,6 +3,7 @@ import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoBadge from '../components/EstadoBadge.jsx';
 import ListaCambios from '../components/ListaCambios.jsx';
+import { textoEspacio } from '../components/SelectorLugar.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Badge from '../components/ui/Badge.jsx';
@@ -178,7 +179,7 @@ function DetalleRegistro({ registro: r }) {
         ['Fecha', r.fecha ? formatearFecha(r.fecha) : '—'],
         ['Horario', formatearHorario(r) || '—'],
         ['Cantidad de personas', r.cantidadPersonas ?? '—'],
-        ['Lugar', r.lugar || '—'],
+        ['Lugar', r.espacio ? textoEspacio(r.espacio) : r.lugar || '—'],
         ['Requerimientos técnicos', r.requerimientosTecnicos || '—'],
         ['Servicios adicionales', r.servicios.length ? r.servicios.map((s) => s.nombre).join('\n') : '—'],
         ['Registrada', fechaHora(r.createdAt)]

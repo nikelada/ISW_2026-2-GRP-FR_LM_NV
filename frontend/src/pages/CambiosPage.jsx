@@ -3,6 +3,7 @@ import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoCambio, { ESTADOS_CAMBIO } from '../components/EstadoCambio.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
+import SelectorLugar from '../components/SelectorLugar.jsx';
 import SelectorTipoEvento from '../components/SelectorTipoEvento.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
@@ -14,7 +15,7 @@ import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
 import * as cambioService from '../services/cambioService.js';
 import * as solicitudService from '../services/solicitudService.js';
-import { CAMPOS_EVENTO, etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
+import { CAMPOS_EVENTO, camposCambiados, etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
 import { fechaMinima, formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esGerencia, esProduccion } from '../utils/roles.js';
 
@@ -70,7 +71,7 @@ const columnas = [
       </>
     )
   },
-  { campo: 'cambios', titulo: 'Datos a cambiar', render: (c) => Object.keys(c.cambios).map(etiquetaCampo).join(', ') },
+  { campo: 'cambios', titulo: 'Datos a cambiar', render: (c) => camposCambiados(c.cambios).map(etiquetaCampo).join(', ') },
   { campo: 'estado', titulo: 'Estado', render: (c) => <EstadoCambio cambio={c} /> }
 ];
 
@@ -153,7 +154,7 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
   // Al elegir el evento se cargan sus valores actuales
   useEffect(() => {
     if (!evento) return;
-    setValores(Object.fromEntries(CAMPOS_EVENTO.map(({ campo }) => [campo, evento[campo] ?? ''])));
+    setValores({ ...Object.fromEntries(CAMPOS_EVENTO.map(({ campo }) => [campo, evento[campo] ?? ''])), espacioId: evento.espacioId ?? '' });
     setSeleccion({});
   }, [evento]);
 
@@ -162,6 +163,7 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
     setError('');
     setErrores({});
     const cambios = Object.fromEntries(Object.keys(seleccion).filter((campo) => seleccion[campo]).map((campo) => [campo, valores[campo]]));
+    if (seleccion.lugar) cambios.espacioId = valores.espacioId || null;
     try {
       onRegistrado(await cambioService.registrar({ solicitudId: Number(eventoId), cambios, motivo }));
     } catch (e) {
@@ -192,10 +194,13 @@ function NuevoCambio({ eventoInicial, onCancelar, onRegistrado }) {
                   <input type="checkbox" name={`cambiar-${campo}`} checked={!!seleccion[campo]} onChange={(e) => setSeleccion({ ...seleccion, [campo]: e.target.checked })} />
                   <span>{etiqueta}</span>
                 </label>
-                {seleccion[campo] && tipo === 'lista' && (
+                {seleccion[campo] && tipo === 'tipoEvento' && (
                   <SelectorTipoEvento name={campo} error={errores[campo]} value={valores[campo]} onChange={(valor) => setValores((actual) => ({ ...actual, [campo]: valor }))} />
                 )}
-                {seleccion[campo] && tipo !== 'lista' && (
+                {seleccion[campo] && tipo === 'lugar' && (
+                  <SelectorLugar error={errores[campo]} espacioId={valores.espacioId} lugar={valores.lugar} onChange={(valor) => setValores((actual) => ({ ...actual, ...valor }))} />
+                )}
+                {seleccion[campo] && !['tipoEvento', 'lugar'].includes(tipo) && (
                   <Campo error={errores[campo]}>
                     {tipo === 'textarea'
                       ? <textarea name={campo} value={valores[campo]} onChange={(e) => setValores({ ...valores, [campo]: e.target.value })} />
@@ -269,7 +274,7 @@ function DetalleCambio({ cambio, aviso, gerencia, produccion, onTerminar }) {
           </tr>
         </thead>
         <tbody>
-          {Object.entries(cambio.cambios).map(([campo, valor]) => (
+          {camposCambiados(cambio.cambios).map((campo) => [campo, cambio.cambios[campo]]).map(([campo, valor]) => (
             <tr key={campo}>
               <td className={celda}>{etiquetaCampo(campo)}</td>
               <td className={celda}>{formatearValor(campo, cambio.aplicadoEn ? antes[campo] : evento[campo])}</td>

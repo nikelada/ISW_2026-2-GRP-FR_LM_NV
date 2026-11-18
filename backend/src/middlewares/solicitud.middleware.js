@@ -46,6 +46,10 @@ export function validarSolicitud(req, res, next) {
 
   const lugar = textoOpcional(req.body.lugar);
   if (lugar && lugar.length > 255) errores.lugar = 'El lugar no puede superar 255 caracteres.';
+  // Si el lugar es un espacio de Operaciones también viene su id
+  const espacioTexto = textoOpcional(req.body.espacioId);
+  const espacioId = espacioTexto === null ? null : Number(espacioTexto);
+  if (espacioTexto !== null && (!Number.isInteger(espacioId) || espacioId <= 0)) errores.lugar = 'Elige un lugar de la lista.';
 
   const requerimientosTecnicos = textoOpcional(req.body.requerimientosTecnicos);
   if (requerimientosTecnicos && requerimientosTecnicos.length > 2000) {
@@ -63,6 +67,7 @@ export function validarSolicitud(req, res, next) {
     horaFin: horaFin && horaFin.slice(0, 5),
     cantidadPersonas,
     lugar,
+    espacioId,
     requerimientosTecnicos
   };
   next();
