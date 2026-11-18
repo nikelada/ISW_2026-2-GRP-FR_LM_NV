@@ -371,6 +371,8 @@ async function main() {
       await prisma.tipoEvento.create({ data: { nombre } });
       tiposEventoCreados += 1;
     }
+  }
+
   const datosInventario = [
     { nombre: 'Silla plegable de prueba', categoria: 'Mobiliario', precio: 1500, stock: 100, reutilizable: true, stockFueraServicio: 4 },
     { nombre: 'Mesa plegable de prueba', categoria: 'Mobiliario', precio: 4000, stock: 20, reutilizable: true, stockFueraServicio: 1 },
@@ -547,7 +549,7 @@ async function main() {
   const operacionesDemo = await crearDatosOperacionesDemo(eventoOperacionesDemo.id);
 
   console.log(
-    `Seed completado. Clientes nuevos: ${clientesCreados}; tipos nuevos: ${tiposCreados}; ` +
+    `Seed completado. Clientes nuevos: ${clientesCreados}; tipos de evento nuevos: ${tiposEventoCreados}; tipos nuevos: ${tiposCreados}; ` +
       `servicios nuevos: ${serviciosCreados}; objetos nuevos: ${objetosCreados}; ` +
       `vehículos nuevos: ${vehiculosCreados}; espacios nuevos: ${espaciosCreados}; ` +
       `solicitudes nuevas: ${solicitudesCreadas}; cambios nuevos: ${cambiosCreados}; ` +
@@ -563,4 +565,3 @@ main()
     process.exitCode = 1;
   })
   .finally(() => prisma.$disconnect());
-}
