@@ -31,7 +31,17 @@ export function validarSolicitudCambio(req, res, next) {
 
   const cambios = {};
   const errores = {};
+  const conEspacio = ![undefined, null, ''].includes(entrada.espacioId);
   for (const [campo, valor] of Object.entries(entrada)) {
+    // Si el nuevo lugar es un espacio, su nombre lo pone el servicio
+    if (campo === 'lugar' && conEspacio) continue;
+    // Id del espacio elegido como nuevo lugar
+    if (campo === 'espacioId') {
+      if (valor === null || valor === '') cambios.espacioId = null;
+      else if (Number.isInteger(Number(valor)) && Number(valor) > 0) cambios.espacioId = Number(valor);
+      else errores.lugar = 'Elige un lugar de la lista.';
+      continue;
+    }
     if (!(campo in VALIDADORES)) return res.status(400).json({ message: `El dato «${campo}» no se puede modificar.` });
     const texto = String(valor ?? '').trim();
     if (!texto) {

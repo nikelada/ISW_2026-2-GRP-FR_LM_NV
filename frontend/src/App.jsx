@@ -10,21 +10,23 @@ import ServiciosPage from './pages/ServiciosPage.jsx';
 import SolicitudesPage from './pages/SolicitudesPage.jsx';
 import InventarioPage from './pages/InventarioPage.jsx';
 import OperacionesPage from './pages/OperacionesPage.jsx';
+import UbicacionesPage from './pages/UbicacionesPage.jsx';
 import { getCurrentUser } from './services/authService.js';
 import * as cambioService from './services/cambioService.js';
 import { esGerencia } from './utils/roles.js';
 import { clearSession, getStoredSession } from './utils/session.js';
 
-// Secciones del menú (se navega con #/clave?parametros)
+// Secciones del menú en el orden del proceso
 const SECCIONES = [
   { clave: 'clientes', titulo: 'Clientes', Pagina: ClientesPage, roles: ['usuario', 'admin'] },
   { clave: 'solicitudes', titulo: 'Solicitudes', Pagina: SolicitudesPage, roles: ['usuario', 'admin'] },
-  { clave: 'servicios', titulo: 'Servicios', Pagina: ServiciosPage, roles: ['usuario', 'manager', 'admin'] },
-  { clave: 'cotizaciones', titulo: 'Cotizaciones', Pagina: CotizacionesPage, roles: ['usuario', 'manager', 'admin'] },
   { clave: 'calendario', titulo: 'Calendario', Pagina: CalendarioPage, roles: ['usuario', 'manager', 'admin'] },
   { clave: 'cambios', titulo: 'Cambios', Pagina: CambiosPage, roles: ['usuario', 'manager', 'admin'] },
   { clave: 'historial', titulo: 'Historial', Pagina: HistorialPage, roles: ['usuario', 'admin'] },
+  { clave: 'servicios', titulo: 'Servicios', Pagina: ServiciosPage, roles: ['usuario', 'manager', 'admin'] },
+  { clave: 'cotizaciones', titulo: 'Cotizaciones', Pagina: CotizacionesPage, roles: ['usuario', 'manager', 'admin'] },
   { clave: 'inventario', titulo: 'Inventario', Pagina: InventarioPage, roles: ['manager', 'admin'] },
+  { clave: 'ubicaciones', titulo: 'Ubicaciones', Pagina: UbicacionesPage, roles: ['admin'] },
   { clave: 'operaciones', titulo: 'Operaciones', Pagina: OperacionesPage, roles: ['manager', 'admin'] }
 ];
 

@@ -1,7 +1,9 @@
 import { prisma } from '../config/prisma.js';
+import { crearConCodigo } from '../utils/codigo.js';
 import { fechaActual } from '../utils/fecha.js';
 import * as clienteService from './cliente.service.js';
 import { aRespuesta as aRespuestaServicio, INCLUIR_SERVICIO } from './servicio.service.js';
+import { asegurarTipoEvento } from './tipoEvento.service.js';
 
 // Información obligatoria para que la solicitud quede registrada.
 const CAMPOS_OBLIGATORIOS = [
@@ -18,6 +20,7 @@ const CAMPOS_OBLIGATORIOS = [
 const ESTADOS = ['pendiente', 'registrada', 'confirmado'];
 export const INCLUIR_SOLICITUD = {
   cliente: { select: { id: true, nombre: true } },
+  espacio: true,
   servicios: {
     include: {
       servicio: { include: INCLUIR_SERVICIO },
@@ -33,12 +36,12 @@ export const aHora = (texto) => (texto ? new Date(`1970-01-01T${texto}:00Z`) : n
 export const textoFecha = (valor) => (valor ? valor.toISOString().slice(0, 10) : null);
 export const textoHora = (valor) => (valor ? valor.toISOString().slice(11, 16) : null);
 
-// No se aceptan fechas anteriores a hoy
+// Solo se aceptan fechas desde mañana
 export function asegurarFechaNoPasada(fecha) {
-  if (fecha && fecha < textoFecha(fechaActual())) {
-    throw Object.assign(new Error('La fecha ya pasó; elige una fecha desde hoy en adelante.'), {
+  if (fecha && fecha <= textoFecha(fechaActual())) {
+    throw Object.assign(new Error('La fecha del evento tiene que ser desde mañana en adelante.'), {
       status: 400,
-      detalles: { errores: { fecha: 'La fecha no puede ser anterior a hoy.' } }
+      detalles: { errores: { fecha: 'La fecha no puede ser hoy ni un día anterior.' } }
     });
   }
 }
@@ -85,9 +88,22 @@ function aDatos(datos, servicios = []) {
     horaFin: aHora(datos.horaFin),
     cantidadPersonas: datos.cantidadPersonas,
     lugar: datos.lugar,
+    espacioId: datos.espacioId,
     requerimientosTecnicos: datos.requerimientosTecnicos,
     estado: calcularEstado({ ...datos, servicios })
   };
+}
+
+// El espacio tiene que existir y no estar fuera de servicio
+export async function lugarDeEspacio(espacioId) {
+  const espacio = await prisma.recursoOperativo.findUnique({ where: { id: espacioId } });
+  if (!espacio || espacio.tipo !== 'espacio' || espacio.estado === 'fuera_servicio') {
+    throw Object.assign(new Error('El lugar elegido no está disponible.'), {
+      status: 400,
+      detalles: { errores: { lugar: 'Elige otro lugar de la lista.' } }
+    });
+  }
+  return espacio.nombre;
 }
 
 // El cliente de la solicitud tiene que estar registrado
@@ -129,7 +145,9 @@ export async function obtenerPorId(id) {
 export async function crear(datos) {
   asegurarFechaNoPasada(datos.fecha);
   await asegurarClienteRegistrado(datos.clienteId);
-  const creada = await prisma.solicitud.create({ data: aDatos(datos), include: INCLUIR_SOLICITUD });
+  await asegurarTipoEvento(datos.tipoEvento);
+  if (datos.espacioId) datos.lugar = await lugarDeEspacio(datos.espacioId);
+  const creada = await crearConCodigo(prisma.solicitud, 'SOL', { data: aDatos(datos), include: INCLUIR_SOLICITUD });
   return aRespuesta(creada);
 }
 
@@ -142,6 +160,8 @@ export async function actualizar(id, datos) {
   // Solo si cambió, para poder seguir completando una solicitud antigua
   if (datos.fecha !== actual.fecha) asegurarFechaNoPasada(datos.fecha);
   if (datos.clienteId !== actual.clienteId) await asegurarClienteRegistrado(datos.clienteId);
+  if (datos.tipoEvento !== actual.tipoEvento) await asegurarTipoEvento(datos.tipoEvento);
+  if (datos.espacioId) datos.lugar = datos.espacioId === actual.espacioId ? actual.lugar : await lugarDeEspacio(datos.espacioId);
 
   const data = aDatos(datos, actual.servicios);
   // Si cambió la fecha u hora hay que volver a revisar la disponibilidad

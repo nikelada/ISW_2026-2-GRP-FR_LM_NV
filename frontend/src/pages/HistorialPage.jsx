@@ -2,7 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoBadge from '../components/EstadoBadge.jsx';
-import EstadoCambio from '../components/EstadoCambio.jsx';
+import ListaCambios from '../components/ListaCambios.jsx';
+import { textoEspacio } from '../components/SelectorLugar.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Badge from '../components/ui/Badge.jsx';
@@ -11,7 +12,6 @@ import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
 import * as clienteService from '../services/clienteService.js';
-import { etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
@@ -33,7 +33,7 @@ function ResultadoCotizacion({ cotizacion }) {
 const esEvento = (registro) => registro.estado === 'confirmado';
 
 const columnas = [
-  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (r) => `#${r.id}` },
+  { campo: 'codigo', titulo: 'Código', className: 'whitespace-nowrap text-stone-500' },
   {
     campo: 'tipo',
     titulo: 'Registro',
@@ -62,11 +62,20 @@ export default function HistorialPage({ user, params }) {
   const [busqueda, setBusqueda] = useState('');
   const [q, setQ] = useState('');
   const { datos: encontrados } = useFetch(useCallback(() => (puedeConsultar && q ? clienteService.listar(q) : Promise.resolve([])), [puedeConsultar, q]));
-  const [clienteId, setClienteId] = useState(params.get('cliente') || '');
+  const [cliente, setCliente] = useState(null);
+  const rutInicial = params.get('cliente');
   const { datos: historial, cargando, error } = useFetch(
-    useCallback(() => (clienteId ? clienteService.historial(clienteId) : Promise.resolve(null)), [clienteId]),
+    useCallback(() => (cliente ? clienteService.historial(cliente.id) : Promise.resolve(null)), [cliente]),
     null
   );
+
+  // Si se llega desde Clientes, el cliente viene por su RUT
+  useEffect(() => {
+    if (!puedeConsultar || !rutInicial) return;
+    clienteService.listar(rutInicial)
+      .then((lista) => setCliente(lista.find((c) => c.rut === rutInicial) || null))
+      .catch(() => setCliente(null));
+  }, [puedeConsultar, rutInicial]);
   const [seleccionadoId, setSeleccionadoId] = useState(null);
   const [filtro, setFiltro] = useState('');
   const registros = historial?.registros || [];
@@ -85,8 +94,8 @@ export default function HistorialPage({ user, params }) {
     return () => clearTimeout(timer);
   }, [busqueda]);
 
-  function elegirCliente(cliente) {
-    setClienteId(String(cliente.id));
+  function elegirCliente(elegido) {
+    setCliente(elegido);
     setSeleccionadoId(null);
     setBusqueda('');
   }
@@ -102,7 +111,7 @@ export default function HistorialPage({ user, params }) {
 
   return (
     <>
-      <EncabezadoPagina antetitulo="Clientes" titulo="Historial de clientes" descripcion="Solicitudes y eventos de un cliente, su estado y los cambios registrados durante su gestión." />
+      <EncabezadoPagina antetitulo="Clientes" titulo="Historial de clientes" descripcion="Aquí se consulta todo lo de un cliente: sus solicitudes, eventos, su estado y los cambios que pidió. Para editar algo se va a Solicitudes o a Cambios." />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
@@ -132,7 +141,7 @@ export default function HistorialPage({ user, params }) {
             </p>
           )}
           {error && <Aviso tipo="error" className="m-3.5">{error}</Aviso>}
-          {!clienteId ? (
+          {!cliente ? (
             <Vacio>Busca un cliente para ver su historial.</Vacio>
           ) : cargando && !historial ? (
             <Vacio>Cargando…</Vacio>
@@ -158,7 +167,7 @@ export default function HistorialPage({ user, params }) {
 function DetalleRegistro({ registro: r }) {
   return (
     <>
-      <Antetitulo className="mb-2">{esEvento(r) ? 'Evento' : 'Solicitud'} #{r.id}</Antetitulo>
+      <Antetitulo className="mb-2">{esEvento(r) ? 'Evento' : 'Solicitud'} {r.codigo}</Antetitulo>
       <h2 className="mb-2 text-xl font-bold">{r.tipoEvento || 'Sin tipo de evento'}</h2>
       <div className="mb-3"><EstadoBadge estado={r.estado} fechaHabilitada={r.fechaHabilitada} /></div>
       {r.faltantes.length > 0 && !esEvento(r) && (
@@ -170,7 +179,7 @@ function DetalleRegistro({ registro: r }) {
         ['Fecha', r.fecha ? formatearFecha(r.fecha) : '—'],
         ['Horario', formatearHorario(r) || '—'],
         ['Cantidad de personas', r.cantidadPersonas ?? '—'],
-        ['Lugar', r.lugar || '—'],
+        ['Lugar', r.espacio ? textoEspacio(r.espacio) : r.lugar || '—'],
         ['Requerimientos técnicos', r.requerimientosTecnicos || '—'],
         ['Servicios adicionales', r.servicios.length ? r.servicios.map((s) => s.nombre).join('\n') : '—'],
         ['Registrada', fechaHora(r.createdAt)]
@@ -185,43 +194,9 @@ function DetalleRegistro({ registro: r }) {
         </section>
       )}
       <section className="border-t border-stone-200 pt-4" aria-label="Cambios solicitados">
-        <Antetitulo className="mb-2.5">Cambios solicitados</Antetitulo>
-        {r.cambios.length ? (
-          <ul className="grid gap-3 text-sm">
-            {r.cambios.map((c) => (
-              <li key={c.id} className="rounded-md border border-stone-200 p-3">
-                <div className="mb-1 flex items-center justify-between gap-2">
-                  <a className="font-semibold text-teal-700 hover:underline" href={`#/cambios?id=${c.id}`}>Cambio #{c.id}</a>
-                  <span><EstadoCambio cambio={c} /></span>
-                </div>
-                <ul className="mb-1">
-                  {Object.entries(c.cambios).map(([campo, valor]) => (
-                    <li key={campo}>{etiquetaCampo(campo)}: <strong>{formatearValor(campo, valor)}</strong></li>
-                  ))}
-                </ul>
-                <p className="text-stone-600">Motivo: {c.motivo}</p>
-                <small className="block text-stone-500">
-                  Registrado por {c.registradoPor} · {fechaHora(c.createdAt)}
-                  {c.revisadoPor ? ` · ${c.estado === 'aprobado' ? 'aprobado' : 'rechazado'} por ${c.revisadoPor}` : ' · pendiente de revisión de Gerencia'}
-                </small>
-              </li>
-            ))}
-          </ul>
-        ) : <p className="text-xs text-stone-500">Sin cambios solicitados.</p>}
-      </section>
-
-      <section className="mt-5 border-t border-stone-200 pt-4" aria-label="Modificaciones aplicadas">
-        <Antetitulo className="mb-2.5">Modificaciones aplicadas</Antetitulo>
-        {r.historial.length ? (
-          <ul className="grid gap-2 text-sm">
-            {r.historial.map((h) => (
-              <li key={h.id}>
-                <strong>{etiquetaCampo(h.campo)}</strong>: {formatearValor(h.campo, h.valorAnterior)} → {formatearValor(h.campo, h.valorNuevo)}
-                <small className="block text-stone-500">{fechaHora(h.createdAt)} · aplicado por {h.usuario} (cambio #{h.cambioId})</small>
-              </li>
-            ))}
-          </ul>
-        ) : <p className="text-xs text-stone-500">Sin modificaciones aplicadas.</p>}
+        <Antetitulo className="mb-1">Cambios solicitados</Antetitulo>
+        <p className="mb-2.5 text-xs text-stone-500">El detalle de cada cambio está en la sección Cambios.</p>
+        <ListaCambios cambios={r.cambios} />
       </section>
 
       <a className="mt-5 inline-block text-sm font-semibold text-teal-700 hover:underline" href={`#/solicitudes?id=${r.id}`}>Abrir en Solicitudes →</a>

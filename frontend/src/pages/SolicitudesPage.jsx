@@ -2,7 +2,10 @@ import { useCallback, useEffect, useState } from 'react';
 import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import EstadoBadge from '../components/EstadoBadge.jsx';
+import ListaCambios from '../components/ListaCambios.jsx';
 import ResultadoDisponibilidad from '../components/ResultadoDisponibilidad.jsx';
+import SelectorLugar, { textoEspacio } from '../components/SelectorLugar.jsx';
+import SelectorTipoEvento from '../components/SelectorTipoEvento.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Boton from '../components/ui/Boton.jsx';
@@ -16,11 +19,10 @@ import * as cambioService from '../services/cambioService.js';
 import * as clienteService from '../services/clienteService.js';
 import * as solicitudService from '../services/solicitudService.js';
 import * as servicioService from '../services/servicioService.js';
-import { etiquetaCampo, formatearValor } from '../utils/camposEvento.js';
-import { formatearFecha, formatearHorario } from '../utils/fechas.js';
+import { fechaMinima, formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
-const VACIO = { clienteId: '', tipoEvento: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '', requerimientosTecnicos: '' };
+const VACIO = { clienteId: '', tipoEvento: '', fecha: '', horaInicio: '', horaFin: '', cantidadPersonas: '', lugar: '', espacioId: '', requerimientosTecnicos: '' };
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
   style: 'currency',
@@ -41,7 +43,7 @@ function textoPrecioServicio(version) {
 const sinDato = (texto = '—') => <span className="text-xs text-amber-700">{texto}</span>;
 
 const columnas = [
-  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (s) => `#${s.id}` },
+  { campo: 'codigo', titulo: 'Código', className: 'whitespace-nowrap text-stone-500' },
   {
     campo: 'cliente',
     titulo: 'Cliente',
@@ -71,14 +73,14 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
   const { datos: solicitudes, cargando, error, recargar } = useFetch(useCallback(() => solicitudService.listar(filtro), [filtro]));
   const texto = busqueda.trim().toLowerCase();
   const visibles = texto
-    ? solicitudes.filter((s) => `${s.cliente.nombre} ${s.tipoEvento || ''}`.toLowerCase().includes(texto))
+    ? solicitudes.filter((s) => `${s.codigo} ${s.cliente.nombre} ${s.tipoEvento || ''}`.toLowerCase().includes(texto))
     : solicitudes;
   const { datos: clientes } = useFetch(useCallback(() => clienteService.listar(), []));
   const { datos: serviciosDisponibles, error: errorServicios } = useFetch(useCallback(() => servicioService.listar(), []));
 
   const [seleccionada, setSeleccionada] = useState(null);
   const [modo, setModo] = useState(puedeEditar && params.get('nueva') === '1' ? 'nueva' : 'detalle');
-  const [form, setForm] = useState({ ...VACIO, clienteId: params.get('cliente') || '' });
+  const [form, setForm] = useState(VACIO);
   const [errores, setErrores] = useState({});
   const [aviso, setAviso] = useState(null);
   const [guardando, setGuardando] = useState(false);
@@ -87,6 +89,13 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
   const [servicioProcesando, setServicioProcesando] = useState('');
   const [resultado, setResultado] = useState(null);
   const idInicial = Number(params.get('id')) || null;
+  const rutCliente = params.get('cliente');
+
+  // Si se llega desde Clientes, el cliente viene por su RUT
+  useEffect(() => {
+    const cliente = rutCliente && clientes.find((c) => c.rut === rutCliente);
+    if (cliente) setForm((actual) => (actual.clienteId ? actual : { ...actual, clienteId: String(cliente.id) }));
+  }, [clientes, rutCliente]);
 
   // Actualiza el detalle cuando se recarga la lista y abre la solicitud que venga en la URL
   // (por ejemplo cuando se llega desde el calendario)
@@ -145,7 +154,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
       setSeleccionada(guardada);
       setModo('detalle');
       setErrores({});
-      setAviso({ tipo: 'success', texto: `Solicitud #${guardada.id} guardada.` });
+      setAviso({ tipo: 'success', texto: `Solicitud ${guardada.codigo} guardada.` });
       limpiarParametros();
       recargar();
     } catch (e) {
@@ -216,13 +225,13 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
 
   return (
     <>
-      <EncabezadoPagina antetitulo="Gestión" titulo="Solicitudes de eventos" descripcion="Solicitudes de eventos asociadas a clientes registrados y su estado.">
+      <EncabezadoPagina antetitulo="Gestión" titulo="Solicitudes de eventos" descripcion="Aquí se registran las solicitudes y se editan mientras el evento no esté confirmado. Después de confirmado, los cambios se registran en Cambios.">
         {puedeEditar && <Boton onClick={nueva}><span>Nueva solicitud</span><span aria-hidden="true">+</span></Boton>}
       </EncabezadoPagina>
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_380px]">
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
-            <input type="search" placeholder="Buscar por cliente o tipo de evento" aria-label="Buscar solicitudes" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            <input type="search" placeholder="Buscar por código, cliente o tipo de evento" aria-label="Buscar solicitudes" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
             <select className="w-auto" aria-label="Filtrar por estado" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
               <option value="">Todos los estados</option>
               <option value="pendiente">Pendientes de información</option>
@@ -262,7 +271,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
             />
           ) : (
             <>
-              <Antetitulo className="mb-2">{modo === 'editar' ? `Solicitud #${seleccionada.id}` : 'Nueva solicitud'}</Antetitulo>
+              <Antetitulo className="mb-2">{modo === 'editar' ? `Solicitud ${seleccionada.codigo}` : 'Nueva solicitud'}</Antetitulo>
               <h2 className="mb-4 text-xl font-bold">{modo === 'editar' ? 'Actualizar solicitud' : 'Registrar solicitud'}</h2>
               {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
               {!clientes.length && <Aviso tipo="warning"><p>No hay clientes registrados. Registra primero el cliente en la sección Clientes.</p></Aviso>}
@@ -273,14 +282,14 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
                     {clientes.map((c) => <option key={c.id} value={c.id}>{c.nombre}{c.rut ? ` · ${c.rut}` : ''}</option>)}
                   </select>
                 </Campo>
-                <Campo etiqueta="Tipo de evento" error={errores.tipoEvento}><input type="text" maxLength={100} placeholder="Ej.: matrimonio, seminario" {...campo('tipoEvento')} /></Campo>
-                <Campo etiqueta="Fecha" error={errores.fecha}><input type="date" {...campo('fecha')} /></Campo>
+                <SelectorTipoEvento etiqueta="Tipo de evento" error={errores.tipoEvento} value={form.tipoEvento} onChange={(tipoEvento) => setForm((actual) => ({ ...actual, tipoEvento }))} />
+                <Campo etiqueta="Fecha" error={errores.fecha}><input type="date" min={fechaMinima()} {...campo('fecha')} /></Campo>
                 <div className="grid grid-cols-2 gap-3">
                   <Campo etiqueta="Hora de inicio" error={errores.horaInicio}><input type="time" {...campo('horaInicio')} /></Campo>
                   <Campo etiqueta="Hora de término" error={errores.horaFin}><input type="time" {...campo('horaFin')} /></Campo>
                 </div>
                 <Campo etiqueta="Cantidad de personas" error={errores.cantidadPersonas}><input type="number" min="1" step="1" {...campo('cantidadPersonas')} /></Campo>
-                <Campo etiqueta="Lugar" error={errores.lugar}><input type="text" maxLength={255} {...campo('lugar')} /></Campo>
+                <SelectorLugar key={seleccionada?.id ?? 'nueva'} etiqueta="Lugar" error={errores.lugar} espacioId={form.espacioId} lugar={form.lugar} onChange={(valor) => setForm((actual) => ({ ...actual, ...valor }))} />
                 <Campo etiqueta="Requerimientos técnicos" error={errores.requerimientosTecnicos}><textarea rows={3} maxLength={2000} {...campo('requerimientosTecnicos')} /></Campo>
                 <p className="text-xs text-stone-500">El cliente es obligatorio. Los servicios adicionales se asocian después de guardar la solicitud. Si falta algún otro dato, la solicitud quedará pendiente hasta completarla.</p>
                 <div className="flex gap-2.5">
@@ -341,13 +350,13 @@ function DetalleSolicitud({
   const servicioSeleccionado = serviciosDelTipo.find((servicio) => servicio.id === Number(servicioParaAgregar));
   return (
     <>
-      <Antetitulo className="mb-2">Solicitud #{s.id}</Antetitulo>
+      <Antetitulo className="mb-2">Solicitud {s.codigo}</Antetitulo>
       <h2 className="mb-2 text-xl font-bold">{s.cliente.nombre}</h2>
       <div className="mb-4" data-estado-detalle><EstadoBadge estado={s.estado} fechaHabilitada={s.fechaHabilitada} /></div>
       {aviso && <Aviso tipo={aviso.tipo}><p>{aviso.texto}</p></Aviso>}
       {confirmada ? (
-        <Aviso tipo="success" titulo="Evento con fecha confirmada">
-          <p>Sus datos solo se modifican mediante un cambio aprobado por Gerencia.</p>
+        <Aviso tipo="success" titulo="Evento confirmado: ya no se edita">
+          <p>Cualquier cambio que pida el cliente se registra en Cambios y lo aprueba Gerencia.</p>
         </Aviso>
       ) : s.faltantes.length ? (
         <Aviso tipo="warning" titulo="Solicitud pendiente: falta información obligatoria">
@@ -363,7 +372,7 @@ function DetalleSolicitud({
         ['Fecha', s.fecha ? formatearFecha(s.fecha) : '—'],
         ['Horario', formatearHorario(s) || '—'],
         ['Cantidad de personas', s.cantidadPersonas ?? '—'],
-        ['Lugar', s.lugar || '—'],
+        ['Lugar', s.espacio ? textoEspacio(s.espacio) : s.lugar || '—'],
         ['Requerimientos técnicos', s.requerimientosTecnicos || '—']
       ]} />
       <div className="mb-4 border-t border-stone-200 pt-4">
@@ -447,37 +456,26 @@ function DetalleSolicitud({
         {puedeEditar && !confirmada && (
           <Boton onClick={onEditar}><span>{s.faltantes.length ? 'Completar información' : 'Editar solicitud'}</span><span aria-hidden="true">→</span></Boton>
         )}
-        {puedeRevisarFecha && <Boton variante="secundario" onClick={onRevisarFecha}>Revisar disponibilidad de la fecha</Boton>}
+        {puedeRevisarFecha && <Boton variante="secundario" onClick={onRevisarFecha}>Revisar y habilitar la fecha</Boton>}
         {puedeEditar && confirmada && (
-          <Boton onClick={onRegistrarCambio}><span>Registrar cambio solicitado</span><span aria-hidden="true">→</span></Boton>
+          <Boton onClick={onRegistrarCambio}><span>Registrar cambio</span><span aria-hidden="true">→</span></Boton>
+        )}
+        {puedeEditar && !confirmada && (
+          <p className="text-xs text-stone-500">Se puede editar hasta que el evento se confirme. Después, los cambios se registran en Cambios y los aprueba Gerencia.</p>
         )}
       </div>
-      {confirmada && <HistorialEvento key={s.id} solicitudId={s.id} />}
+      {confirmada && <CambiosDelEvento key={s.id} solicitudId={s.id} />}
     </>
   );
 }
 
-// Lo que se le ha cambiado al evento
-function HistorialEvento({ solicitudId }) {
-  const { datos: historial, cargando } = useFetch(useCallback(() => cambioService.historialDeEvento(solicitudId), [solicitudId]));
+// Cambios pedidos para este evento, con enlace a Cambios
+function CambiosDelEvento({ solicitudId }) {
+  const { datos: cambios, cargando } = useFetch(useCallback(() => cambioService.listar('', solicitudId), [solicitudId]));
   return (
-    <section className="mt-5 border-t border-stone-200 pt-4" aria-label="Historial de modificaciones">
-      <Antetitulo className="mb-2.5">Historial de modificaciones</Antetitulo>
-      {cargando && !historial.length ? <p className="text-xs text-stone-500">Cargando…</p> : !historial.length ? (
-        <p className="text-xs text-stone-500">Sin modificaciones registradas.</p>
-      ) : (
-        <ul className="grid gap-2.5 text-sm">
-          {historial.map((h) => (
-            <li key={h.id}>
-              <strong>{etiquetaCampo(h.campo)}</strong>: {formatearValor(h.campo, h.valorAnterior)} → {formatearValor(h.campo, h.valorNuevo)}
-              <small className="mt-0.5 block text-stone-500">
-                {new Date(h.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })} · aplicado por {h.usuario}
-                {h.cambio.revisadoPor ? ` · aprobado por ${h.cambio.revisadoPor}` : ''} (cambio #{h.cambio.id}: {h.cambio.motivo})
-              </small>
-            </li>
-          ))}
-        </ul>
-      )}
+    <section className="mt-5 border-t border-stone-200 pt-4" aria-label="Cambios del evento">
+      <Antetitulo className="mb-2.5">Cambios del evento</Antetitulo>
+      {cargando && !cambios.length ? <p className="text-xs text-stone-500">Cargando…</p> : <ListaCambios cambios={cambios} />}
     </section>
   );
 }

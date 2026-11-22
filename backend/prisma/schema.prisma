@@ -62,17 +62,25 @@ enum EstadoVersionServicio {
 // Solicitud de evento. Si le falta algún dato queda pendiente
 model Solicitud {
   id                     Int                 @id @default(autoincrement())
+  // se muestra en vez del id (SOL-2026-0001)
+  codigo                 String              @unique @db.VarChar(20)
   clienteId              Int
   cliente                Cliente             @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  // se elige de la lista de tipos de evento
   tipoEvento             String?             @db.VarChar(100)
+  tipo                   TipoEvento?         @relation(fields: [tipoEvento], references: [nombre], onDelete: Restrict, onUpdate: Cascade)
   fecha                  DateTime?           @db.Date
   horaInicio             DateTime?           @db.Time(0)
   horaFin                DateTime?           @db.Time(0)
   cantidadPersonas       Int?
   lugar                  String?             @db.VarChar(255)
+  // si el lugar es uno de los espacios de Operaciones
+  espacioId              Int?
+  espacio                RecursoOperativo?   @relation(fields: [espacioId], references: [id], onDelete: SetNull)
   requerimientosTecnicos String?             @db.Text
   // servicios adicionales (del catálogo)
   servicios              SolicitudServicio[]
+  reservasInventario    ReservaInventario[]
   reservasRecursos       ReservaRecurso[]
   personalAsignado       PersonalEvento[]
   tareas                 TareaEvento[]
@@ -92,13 +100,27 @@ model Solicitud {
   @@map("solicitudes")
 }
 
+// Tipos de evento para elegir en la solicitud
+model TipoEvento {
+  id          Int         @id @default(autoincrement())
+  nombre      String      @unique @db.VarChar(100)
+  solicitudes Solicitud[]
+  createdAt   DateTime    @default(now()) @db.Timestamp(6)
+
+  @@map("tipos_evento")
+}
+
 model Inventario {
-  id        Int      @id @default(autoincrement())
-  nombre    String   @db.VarChar(150)
-  precio    Decimal  @db.Decimal(10, 2)
-  stock     Int
-  createdAt DateTime @default(now()) @db.Timestamp(6)
-  updatedAt DateTime @updatedAt @db.Timestamp(6)
+  id                 Int                 @id @default(autoincrement())
+  nombre             String              @db.VarChar(150)
+  categoria          String              @default("Sin clasificar") @db.VarChar(100)
+  precio             Decimal             @db.Decimal(10, 2)
+  stock              Int
+  reutilizable       Boolean             @default(false)
+  stockFueraServicio Int                 @default(0)
+  reservas           ReservaInventario[]
+  createdAt          DateTime            @default(now()) @db.Timestamp(6)
+  updatedAt          DateTime            @updatedAt @db.Timestamp(6)
 
   @@map("inventario")
 }
@@ -112,6 +134,8 @@ enum EstadoCambio {
 // Cambio que pide el cliente sobre un evento ya confirmado
 model SolicitudCambio {
   id                   Int               @id @default(autoincrement())
+  // se muestra en vez del id (CAM-2026-0001)
+  codigo               String            @unique @db.VarChar(20)
   solicitudId          Int
   solicitud            Solicitud         @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
   // ej: { "horaFin": "23:59", "lugar": "Salón Sur" }
@@ -310,14 +334,17 @@ enum EstadoCierreEvento {
 }
 
 model RecursoOperativo {
-  id        Int                    @id @default(autoincrement())
-  nombre    String                 @db.VarChar(150)
-  tipo      TipoRecursoOperativo
-  categoria String                 @db.VarChar(100)
-  estado    EstadoRecursoOperativo @default(disponible)
-  reservas  ReservaRecurso[]
-  createdAt DateTime               @default(now()) @db.Timestamp(6)
-  updatedAt DateTime               @updatedAt @db.Timestamp(6)
+  id          Int                    @id @default(autoincrement())
+  nombre      String                 @db.VarChar(150)
+  tipo        TipoRecursoOperativo
+  categoria   String                 @db.VarChar(100)
+  precio      Decimal?               @db.Decimal(10, 2)
+  ubicacion   String?                @db.VarChar(255)
+  estado      EstadoRecursoOperativo @default(disponible)
+  reservas    ReservaRecurso[]
+  solicitudes Solicitud[]
+  createdAt   DateTime               @default(now()) @db.Timestamp(6)
+  updatedAt   DateTime               @updatedAt @db.Timestamp(6)
 
   @@index([tipo, categoria, estado])
   @@map("recursos_operativos")
@@ -335,6 +362,21 @@ model ReservaRecurso {
   @@unique([recursoId, solicitudId])
   @@index([solicitudId])
   @@map("reservas_recursos")
+}
+
+model ReservaInventario {
+  id          Int        @id @default(autoincrement())
+  inventarioId Int
+  solicitudId Int
+  cantidad    Int
+  inventario  Inventario @relation(fields: [inventarioId], references: [id], onDelete: Restrict)
+  solicitud   Solicitud  @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  devueltoEn  DateTime?  @db.Timestamp(6)
+  createdAt   DateTime   @default(now()) @db.Timestamp(6)
+
+  @@index([inventarioId, solicitudId])
+  @@index([solicitudId])
+  @@map("reservas_inventario")
 }
 
 model PersonalEventual {

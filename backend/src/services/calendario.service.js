@@ -52,10 +52,10 @@ function sumarDias(fecha, dias) {
 }
 
 // Si la fecha choca, busca otros horarios ese mismo día (justo antes o después de los
-// eventos confirmados) y el mismo horario en los días cercanos. Solo desde hoy.
+// eventos confirmados) y el mismo horario en los días cercanos. Solo desde mañana.
 export async function buscarAlternativas({ fecha, horaInicio, horaFin, excluirId }) {
-  const hoy = textoFecha(fechaActual());
-  const desde = [hoy, sumarDias(fecha, -DIAS_ALTERNATIVAS)].sort().at(-1);
+  const manana = sumarDias(textoFecha(fechaActual()), 1);
+  const desde = [manana, sumarDias(fecha, -DIAS_ALTERNATIVAS)].sort().at(-1);
   const hasta = sumarDias(fecha, DIAS_ALTERNATIVAS);
   const confirmados = await prisma.solicitud.findMany({
     where: {
@@ -80,7 +80,7 @@ export async function buscarAlternativas({ fecha, horaInicio, horaFin, excluirId
   const pedido = { inicio: aMinutos(horaInicio), fin: aMinutos(horaFin) };
   const duracion = pedido.fin - pedido.inicio;
 
-  const candidatos = (fecha >= hoy ? ocupadosPorDia.get(fecha) || [] : [])
+  const candidatos = (fecha >= manana ? ocupadosPorDia.get(fecha) || [] : [])
     .flatMap((ocupado) => [
       { inicio: ocupado.fin, fin: ocupado.fin + duracion },
       { inicio: ocupado.inicio - duracion, fin: ocupado.inicio }
@@ -94,7 +94,7 @@ export async function buscarAlternativas({ fecha, horaInicio, horaFin, excluirId
   const otrasFechas = [];
   for (let dias = 1; dias <= DIAS_ALTERNATIVAS && otrasFechas.length < MAX_ALTERNATIVAS; dias += 1) {
     for (const dia of [sumarDias(fecha, dias), sumarDias(fecha, -dias)]) {
-      if (dia >= hoy && otrasFechas.length < MAX_ALTERNATIVAS && estaLibre(dia, pedido)) {
+      if (dia >= manana && otrasFechas.length < MAX_ALTERNATIVAS && estaLibre(dia, pedido)) {
         otrasFechas.push(aAlternativa(dia, pedido));
       }
     }
