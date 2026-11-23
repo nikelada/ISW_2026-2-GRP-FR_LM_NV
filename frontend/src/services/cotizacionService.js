@@ -17,3 +17,6 @@ export const obtener = (id) => api.get(`/cotizaciones/${id}`);
 export const calcular = (datos) => api.post('/cotizaciones/calcular', datos);
 
 export const crear = (datos) => api.post('/cotizaciones', datos);
+
+// RF-10: Gerencia aprueba una cotización en revisión
+export const aprobar = (id) => api.patch(`/cotizaciones/${id}/aprobar`);

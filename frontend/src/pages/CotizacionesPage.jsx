@@ -13,7 +13,7 @@ import { useFetch } from '../hooks/useFetch.js';
 import * as cotizacionService from '../services/cotizacionService.js';
 import * as servicioService from '../services/servicioService.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
-import { esProduccion } from '../utils/roles.js';
+import { esGerencia, esProduccion } from '../utils/roles.js';
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
   style: 'currency',
@@ -127,6 +127,13 @@ export default function CotizacionesPage({ user, params }) {
     porAprobar.recargar();
   }
 
+  // Aprobada, sale de "Revisión pendiente"
+  function alAprobar(aprobada) {
+    setSeleccionadoId(null);
+    setAviso(`Cotización de ${aprobada.solicitud.cliente} aprobada.`);
+    porAprobar.recargar();
+  }
+
   return (
     <>
       <EncabezadoPagina
@@ -164,6 +171,7 @@ export default function CotizacionesPage({ user, params }) {
           )}
         </Panel>
         <Panel lateral>
+          {aviso && <Aviso tipo="success">{aviso}</Aviso>}
           {!seleccionado ? (
             <>
               <Antetitulo>Detalle</Antetitulo>
@@ -174,10 +182,7 @@ export default function CotizacionesPage({ user, params }) {
               ? <Vacio>Cargando…</Vacio>
               : <CotizarSolicitud key={seleccionado.id} solicitud={seleccionado} catalogo={catalogo.datos} errorCatalogo={catalogo.error} onEnviada={alEnviar} />
           ) : (
-            <>
-              {aviso && <Aviso tipo="success">{aviso}</Aviso>}
-              <DetalleCotizacion key={seleccionado.id} cotizacion={seleccionado} user={user} />
-            </>
+            <DetalleCotizacion key={seleccionado.id} cotizacion={seleccionado} user={user} onAprobada={alAprobar} />
           )}
         </Panel>
       </div>
@@ -219,8 +224,24 @@ function DetalleCalculo({ detalles, total, accion }) {
   );
 }
 
-function DetalleCotizacion({ cotizacion: c, user }) {
+function DetalleCotizacion({ cotizacion: c, user, onAprobada }) {
   const { solicitud } = c;
+  // RF-10: Gerencia revisa las cotizaciones que están en su revisión
+  const puedeRevisar = esGerencia(user) && c.estado === 'pendiente_revision';
+  const [aprobando, setAprobando] = useState(false);
+  const [error, setError] = useState('');
+
+  async function aprobar() {
+    setAprobando(true);
+    setError('');
+    try {
+      onAprobada(await cotizacionService.aprobar(c.id));
+    } catch (e) {
+      setError(e.message);
+      setAprobando(false);
+    }
+  }
+
   return (
     <>
       <Antetitulo className="mb-2">Cotización #{c.id}</Antetitulo>
@@ -236,6 +257,17 @@ function DetalleCotizacion({ cotizacion: c, user }) {
         ['Registrada', new Date(c.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })]
       ]} />
       <DetalleCalculo detalles={c.detalles} total={c.total} />
+      {error && <Aviso tipo="error" className="mt-3.5">{error}</Aviso>}
+      {puedeRevisar && (
+        <div className="mt-5 grid gap-2.5">
+          <Boton onClick={aprobar} disabled={aprobando}>
+            <span>{aprobando ? 'Aprobando…' : 'Aprobar cotización'}</span><span aria-hidden="true">→</span>
+          </Boton>
+          <Boton variante="secundario" className="disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 disabled:hover:border-stone-300" disabled>
+            Solicitar modificaciones
+          </Boton>
+        </div>
+      )}
       {/* Gerencia no tiene la sección Solicitudes */}
       {esProduccion(user) && (
         <a className="mt-5 inline-block text-sm font-semibold text-teal-700 hover:underline" href={`#/solicitudes?id=${solicitud.id}`}>Abrir en Solicitudes →</a>
