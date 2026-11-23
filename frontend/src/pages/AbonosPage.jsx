@@ -9,7 +9,7 @@ import ListaDatos from '../components/ui/ListaDatos.jsx';
 import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
-import * as cotizacionService from '../services/cotizacionService.js';
+import * as abonoService from '../services/abonoService.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
@@ -18,10 +18,14 @@ const formatoPrecio = new Intl.NumberFormat('es-CL', {
   maximumFractionDigits: 0
 });
 
-const DESHABILITADO = 'disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 disabled:hover:border-stone-300';
+// AAAA-MM-DD (como lo manda el backend) a dd-mm-aaaa
+const fechaDDMMAAAA = (fecha) => fecha.split('-').reverse().join('-');
 
-// RF-08: el abono inicial corresponde al 50% del total
-const abonoMinimo = (total) => total / 2;
+// Hoy como AAAA-MM-DD (fecha local), para proponerla en el campo y como máximo
+function hoy() {
+  const ahora = new Date();
+  return `${ahora.getFullYear()}-${String(ahora.getMonth() + 1).padStart(2, '0')}-${String(ahora.getDate()).padStart(2, '0')}`;
+}
 
 const columnas = [
   { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (c) => `#${c.id}` },
@@ -48,14 +52,29 @@ const columnas = [
 export default function AbonosPage() {
   const [busqueda, setBusqueda] = useState('');
   const [seleccionadaId, setSeleccionadaId] = useState(null);
-  const { datos: cotizaciones, cargando, error } = useFetch(
-    useCallback(() => cotizacionService.listar({ estado: 'aceptada' }), [])
+  const [aviso, setAviso] = useState(null);
+  const { datos: cotizaciones, cargando, error, recargar } = useFetch(
+    useCallback(() => abonoService.listar(), [])
   );
   const seleccionada = cotizaciones.find((c) => c.id === seleccionadaId) || null;
   const texto = busqueda.trim().toLowerCase();
   const visibles = texto
     ? cotizaciones.filter((c) => `${c.solicitud.cliente} ${c.solicitud.tipoEvento || ''}`.toLowerCase().includes(texto))
     : cotizaciones;
+
+  function seleccionar(c) {
+    setSeleccionadaId(c.id);
+    setAviso(null);
+  }
+
+  function alRegistrar(actualizada, monto) {
+    setAviso(
+      actualizada.eventoConfirmado
+        ? `Abono de ${formatoPrecio.format(monto)} registrado. El evento de ${actualizada.solicitud.cliente} quedó confirmado.`
+        : `Abono de ${formatoPrecio.format(monto)} registrado.`
+    );
+    recargar();
+  }
 
   return (
     <>
@@ -78,13 +97,14 @@ export default function AbonosPage() {
               datos={visibles}
               vacio={texto ? 'No hay resultados para la búsqueda.' : 'No hay cotizaciones aceptadas.'}
               seleccionadoId={seleccionadaId}
-              onSeleccionar={(c) => setSeleccionadaId(c.id)}
+              onSeleccionar={seleccionar}
             />
           )}
         </Panel>
         <Panel lateral>
+          {aviso && <Aviso tipo="success">{aviso}</Aviso>}
           {seleccionada ? (
-            <DetalleAbonos key={seleccionada.id} cotizacion={seleccionada} />
+            <DetalleAbonos key={seleccionada.id} cotizacion={seleccionada} onRegistrado={alRegistrar} />
           ) : (
             <>
               <Antetitulo>Detalle</Antetitulo>
@@ -97,12 +117,36 @@ export default function AbonosPage() {
   );
 }
 
-function DetalleAbonos({ cotizacion: c }) {
+// RF-08: total, abono mínimo (50%), abono actual (se expande con cada abono), saldo pendiente y el
+// formulario para registrar un abono. El monto no puede superar el saldo y la fecha va entre el día
+// de la aceptación y hoy (el backend valida lo mismo).
+function DetalleAbonos({ cotizacion: c, onRegistrado }) {
   const { solicitud } = c;
-  // Sin la tabla de abonos todavía no hay abonos registrados
-  const abonoActual = 0;
-  // RF-08: lo que falta pagar para completar el total
-  const saldoPendiente = c.total - abonoActual;
+  const [monto, setMonto] = useState('');
+  const [fecha, setFecha] = useState(hoy);
+  const [errores, setErrores] = useState({});
+  const [error, setError] = useState('');
+  const [registrando, setRegistrando] = useState(false);
+  const pagada = c.saldoPendiente <= 0;
+
+  async function registrar(event) {
+    event.preventDefault();
+    setRegistrando(true);
+    setErrores({});
+    setError('');
+    try {
+      const actualizada = await abonoService.registrar({ cotizacionId: c.id, monto: Number(monto), fecha });
+      onRegistrado(actualizada, Number(monto));
+      setMonto('');
+      setFecha(hoy());
+    } catch (e) {
+      setErrores(e.data?.errores || {});
+      setError(e.message);
+    } finally {
+      setRegistrando(false);
+    }
+  }
+
   return (
     <>
       <Antetitulo className="mb-2">Cotización #{c.id}</Antetitulo>
@@ -120,26 +164,63 @@ function DetalleAbonos({ cotizacion: c }) {
         </p>
         <p className="flex justify-between">
           <span className="text-stone-600">Abono mínimo</span>
-          <span className="whitespace-nowrap font-medium">{formatoPrecio.format(abonoMinimo(c.total))}</span>
+          <span className="whitespace-nowrap font-medium">{formatoPrecio.format(c.abonoMinimo)}</span>
         </p>
-        <p className="flex justify-between">
-          <span className="text-stone-600">Abono actual</span>
-          <span className="whitespace-nowrap font-medium">{formatoPrecio.format(abonoActual)}</span>
-        </p>
+        <details className="group">
+          <summary className="flex cursor-pointer list-none justify-between">
+            <span className="text-stone-600">
+              Abono actual <span aria-hidden="true" className="inline-block transition-transform group-open:rotate-90">▸</span>
+            </span>
+            <span className="whitespace-nowrap font-medium">{formatoPrecio.format(c.abonoActual)}</span>
+          </summary>
+          {c.abonos.length ? (
+            <ul className="mt-2 grid gap-1 rounded-md bg-stone-50 px-3 py-2 text-xs">
+              {c.abonos.map((abono) => (
+                <li key={abono.id} className="flex justify-between">
+                  <span className="text-stone-600">{fechaDDMMAAAA(abono.fecha)}</span>
+                  <span className="whitespace-nowrap">{formatoPrecio.format(abono.monto)}</span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="mt-2 rounded-md bg-stone-50 px-3 py-2 text-xs text-stone-500">Sin abonos registrados.</p>
+          )}
+        </details>
         <p className="flex justify-between">
           <span className="text-stone-600">Saldo pendiente</span>
-          <span className="whitespace-nowrap font-medium">{formatoPrecio.format(saldoPendiente)}</span>
+          <span className="whitespace-nowrap font-medium">{formatoPrecio.format(c.saldoPendiente)}</span>
         </p>
       </section>
 
-      <div className="mt-5 grid gap-2.5 border-t border-stone-200 pt-4">
-        <Campo etiqueta="Ingresar abono">
-          <input type="number" inputMode="numeric" min="1" step="1" placeholder="Monto" disabled />
+      <form className="mt-5 grid gap-2.5 border-t border-stone-200 pt-4" onSubmit={registrar} noValidate>
+        <Campo etiqueta="Ingresar abono" error={errores.monto}>
+          <input
+            type="number"
+            inputMode="numeric"
+            min="1"
+            max={c.saldoPendiente}
+            step="1"
+            placeholder="Monto"
+            value={monto}
+            disabled={pagada || registrando}
+            onChange={(e) => setMonto(e.target.value)}
+          />
         </Campo>
-        <Boton className={`w-full ${DESHABILITADO}`} disabled>
-          <span>Registrar abono</span><span aria-hidden="true">→</span>
+        <Campo etiqueta="Fecha del pago" error={errores.fecha}>
+          <input
+            type="date"
+            min={c.aceptadaEn || undefined}
+            max={hoy()}
+            value={fecha}
+            disabled={pagada || registrando}
+            onChange={(e) => setFecha(e.target.value)}
+          />
+        </Campo>
+        {error && !Object.keys(errores).length && <Aviso tipo="error" className="mb-0">{error}</Aviso>}
+        <Boton type="submit" className="w-full" disabled={pagada || registrando || !monto || !fecha}>
+          <span>{registrando ? 'Registrando…' : 'Registrar abono'}</span><span aria-hidden="true">→</span>
         </Boton>
-      </div>
+      </form>
     </>
   );
 }
