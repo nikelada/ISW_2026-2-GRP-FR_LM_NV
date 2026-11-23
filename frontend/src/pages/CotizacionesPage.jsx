@@ -35,7 +35,14 @@ const ESTADOS = {
 // Las dos vistas de la página
 const VISTAS = {
   cotizar: 'Cotización pendiente',
-  aprobar: 'Revisión pendiente'
+  aprobar: 'Revisión pendiente',
+  aprobadas: 'Cotización aprobada'
+};
+
+const VACIO_POR_VISTA = {
+  cotizar: 'No hay solicitudes pendientes de cotizar.',
+  aprobar: 'No hay cotizaciones pendientes de revisión.',
+  aprobadas: 'No hay cotizaciones aprobadas.'
 };
 
 const LABEL_TIPO_PRECIO = { fijo: 'Precio fijo', por_hora: 'Por hora' };
@@ -93,10 +100,12 @@ export default function CotizacionesPage({ user, params }) {
 
   const porCotizar = useFetch(useCallback(() => (puedeCotizar ? cotizacionService.listarPorCotizar() : sinResultados()), [puedeCotizar]));
   const porAprobar = useFetch(useCallback(() => cotizacionService.listar({ estado: 'pendiente_revision' }), []));
+  // Las aprobadas por Gerencia, para que Producción y Comercial siga con ellas
+  const aprobadas = useFetch(useCallback(() => (puedeCotizar ? cotizacionService.listar({ estado: 'aprobada' }) : sinResultados()), [puedeCotizar]));
   const catalogo = useFetch(useCallback(() => (puedeCotizar ? servicioService.listar() : sinResultados()), [puedeCotizar]));
 
   const enCotizar = vista === 'cotizar';
-  const lista = enCotizar ? porCotizar : porAprobar;
+  const lista = { cotizar: porCotizar, aprobar: porAprobar, aprobadas }[vista];
   const texto = busqueda.trim().toLowerCase();
   const visibles = texto
     ? lista.datos.filter((fila) => {
@@ -127,11 +136,12 @@ export default function CotizacionesPage({ user, params }) {
     porAprobar.recargar();
   }
 
-  // Aprobada, sale de "Revisión pendiente"
+  // Aprobada, sale de "Revisión pendiente" y pasa a "Cotización aprobada"
   function alAprobar(aprobada) {
     setSeleccionadoId(null);
     setAviso(`Cotización de ${aprobada.solicitud.cliente} aprobada.`);
     porAprobar.recargar();
+    aprobadas.recargar();
   }
 
   return (
@@ -158,13 +168,7 @@ export default function CotizacionesPage({ user, params }) {
             <DataTable
               columnas={enCotizar ? columnasPorCotizar : columnasPorAprobar}
               datos={visibles}
-              vacio={
-                texto
-                  ? 'No hay resultados para la búsqueda.'
-                  : enCotizar
-                    ? 'No hay solicitudes pendientes de cotizar.'
-                    : 'No hay cotizaciones pendientes de revisión.'
-              }
+              vacio={texto ? 'No hay resultados para la búsqueda.' : VACIO_POR_VISTA[vista]}
               seleccionadoId={seleccionadoId}
               onSeleccionar={seleccionar}
             />
