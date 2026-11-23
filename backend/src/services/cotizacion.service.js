@@ -1,4 +1,5 @@
 import { prisma } from '../config/prisma.js';
+import { fechaActual } from '../utils/fecha.js';
 import { INCLUIR_SERVICIO } from './servicio.service.js';
 import * as solicitudService from './solicitud.service.js';
 import { textoFecha, textoHora } from './solicitud.service.js';
@@ -6,7 +7,7 @@ import { textoFecha, textoHora } from './solicitud.service.js';
 // Con estos estados la cotización terminó sin concretarse y se puede cotizar de nuevo la solicitud
 const ESTADOS_CERRADOS = ['rechazada', 'sin_respuesta'];
 
-const INCLUIR_COTIZACION = {
+export const INCLUIR_COTIZACION = {
   solicitud: {
     select: {
       id: true,
@@ -147,8 +148,8 @@ export async function calcular({ solicitudId, servicios: servicioIds }) {
 // líneas siempre suman el total aunque después cambie el horario de la solicitud.
 // Pendiente (RF-10): si el horario cambió, la cotización queda desactualizada; habrá que recalcularla
 // y volver a pasarla por la revisión/aprobación de Gerencia antes de seguir el proceso.
-function aRespuesta(cotizacion) {
-  const { solicitud, detalles, horasEvento: horasGuardadas, ...datos } = cotizacion;
+export function aRespuesta(cotizacion) {
+  const { solicitud, detalles, aceptadaEn, horasEvento: horasGuardadas, ...datos } = cotizacion;
   const horaInicio = textoHora(solicitud.horaInicio);
   const horaFin = textoHora(solicitud.horaFin);
   // Las cotizaciones creadas antes de guardar las horas no las tienen: se usa el horario actual
@@ -169,7 +170,9 @@ function aRespuesta(cotizacion) {
       espacio: solicitud.espacio,
       requerimientosTecnicos: solicitud.requerimientosTecnicos
     },
-    detalles: detalles.map(({ servicio, versionServicio }) => lineaDetalle(servicio, versionServicio, horasEvento))
+    detalles: detalles.map(({ servicio, versionServicio }) => lineaDetalle(servicio, versionServicio, horasEvento)),
+    // día en que el cliente la aceptó (AAAA-MM-DD), o null
+    aceptadaEn: textoFecha(aceptadaEn)
   };
 }
 
@@ -190,8 +193,9 @@ export async function obtenerPorId(id) {
 
 // Pasa la cotización de un estado a otro solo si sigue en el estado esperado; así dos acciones
 // al mismo tiempo no se pisan. Si no está en ese estado responde 409 con el mensaje indicado.
-async function cambiarEstado(id, desde, hacia, mensaje) {
-  const { count } = await prisma.cotizacion.updateMany({ where: { id, estado: desde }, data: { estado: hacia } });
+// En datos van otros campos que se guardan junto con el cambio de estado.
+async function cambiarEstado(id, desde, hacia, mensaje, datos = {}) {
+  const { count } = await prisma.cotizacion.updateMany({ where: { id, estado: desde }, data: { ...datos, estado: hacia } });
   if (!count) {
     await obtenerPorId(id); // 404 si no existe
     throw Object.assign(new Error(mensaje), { status: 409 });
@@ -204,9 +208,12 @@ export function aprobar(id) {
   return cambiarEstado(id, 'pendiente_revision', 'aprobada', 'Solo se pueden aprobar cotizaciones que están en revisión de Gerencia.');
 }
 
-// RF-10: Producción y Comercial registra que el cliente aceptó una cotización aprobada por Gerencia
+// RF-10: Producción y Comercial registra que el cliente aceptó una cotización aprobada por Gerencia.
+// Se guarda el día de la aceptación: los abonos no pueden tener una fecha anterior.
 export function aceptar(id) {
-  return cambiarEstado(id, 'aprobada', 'aceptada', 'Solo se pueden aceptar cotizaciones aprobadas por Gerencia.');
+  return cambiarEstado(id, 'aprobada', 'aceptada', 'Solo se pueden aceptar cotizaciones aprobadas por Gerencia.', {
+    aceptadaEn: fechaActual()
+  });
 }
 
 // Recalcula en el servidor y guarda la cotización pendiente de revisión por Gerencia.
