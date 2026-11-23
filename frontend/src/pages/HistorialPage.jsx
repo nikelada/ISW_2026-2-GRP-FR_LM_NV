@@ -190,7 +190,20 @@ function DetalleRegistro({ registro: r }) {
             <span className="text-stone-500">Resultado de la cotización</span>
             <ResultadoCotizacion cotizacion={r.cotizacion} />
           </div>
-          {r.cotizacion.detalle && <p className="mt-1.5">{r.cotizacion.detalle}</p>}
+          {r.cotizacion.motivos?.length > 0 && (
+            <div className="mt-2">
+              <span className="text-stone-500">Motivos</span>
+              <ul className="mt-1 list-disc pl-5">
+                {r.cotizacion.motivos.map((motivo) => <li key={motivo}>{motivo}</li>)}
+              </ul>
+            </div>
+          )}
+          {r.cotizacion.detalle && (
+            <div className="mt-2">
+              <span className="text-stone-500">Detalle</span>
+              <p className="mt-1 whitespace-pre-line">{r.cotizacion.detalle}</p>
+            </div>
+          )}
         </section>
       )}
       <section className="border-t border-stone-200 pt-4" aria-label="Cambios solicitados">
