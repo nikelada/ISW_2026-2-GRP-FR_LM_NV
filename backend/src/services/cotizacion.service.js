@@ -188,18 +188,26 @@ export async function obtenerPorId(id) {
   return aRespuesta(cotizacion);
 }
 
-// RF-10: Gerencia aprueba una cotización que está en su revisión. El cambio de estado se hace
-// solo si sigue en revisión, así dos aprobaciones al mismo tiempo no pisan otro estado.
-export async function aprobar(id) {
-  const { count } = await prisma.cotizacion.updateMany({
-    where: { id, estado: 'pendiente_revision' },
-    data: { estado: 'aprobada' }
-  });
+// Pasa la cotización de un estado a otro solo si sigue en el estado esperado; así dos acciones
+// al mismo tiempo no se pisan. Si no está en ese estado responde 409 con el mensaje indicado.
+async function cambiarEstado(id, desde, hacia, mensaje) {
+  const { count } = await prisma.cotizacion.updateMany({ where: { id, estado: desde }, data: { estado: hacia } });
   if (!count) {
     await obtenerPorId(id); // 404 si no existe
-    throw Object.assign(new Error('Solo se pueden aprobar cotizaciones que están en revisión de Gerencia.'), { status: 409 });
+    throw Object.assign(new Error(mensaje), { status: 409 });
   }
   return obtenerPorId(id);
+}
+
+// RF-10: Gerencia aprueba una cotización que está en su revisión
+export function aprobar(id) {
+  return cambiarEstado(id, 'pendiente_revision', 'aprobada', 'Solo se pueden aprobar cotizaciones que están en revisión de Gerencia.');
+}
+
+// RF-10: Producción y Comercial registra que el cliente aceptó una cotización aprobada por Gerencia.
+// Desde aquí se pueden registrar los abonos; el evento se confirma cuando suman el 50% (RF-08 y RF-09).
+export function aceptar(id) {
+  return cambiarEstado(id, 'aprobada', 'aceptada', 'Solo se pueden aceptar cotizaciones aprobadas por Gerencia.');
 }
 
 // Recalcula en el servidor y guarda la cotización pendiente de revisión por Gerencia.

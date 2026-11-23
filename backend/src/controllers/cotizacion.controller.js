@@ -32,6 +32,14 @@ export async function aprobar(req, res, next) {
   }
 }
 
+export async function aceptar(req, res, next) {
+  try {
+    res.json(await cotizacionService.aceptar(req.params.id));
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function obtener(req, res, next) {
   try {
     res.json(await cotizacionService.obtenerPorId(req.params.id));

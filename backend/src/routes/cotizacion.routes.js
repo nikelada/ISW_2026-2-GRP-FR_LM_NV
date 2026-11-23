@@ -16,5 +16,7 @@ router.post('/calcular', autorizarRol(ROLES_PRODUCCION), validarCalculo, cotizac
 router.post('/', autorizarRol(ROLES_PRODUCCION), validarCalculo, cotizacionController.crear);
 // RF-10: revisión de Gerencia
 router.patch('/:id/aprobar', autorizarRol(ROLES_GERENCIA), validarId, cotizacionController.aprobar);
+// RF-10: respuesta del cliente, la registra Producción y Comercial
+router.patch('/:id/aceptar', autorizarRol(ROLES_PRODUCCION), validarId, cotizacionController.aceptar);
 
 export default router;
