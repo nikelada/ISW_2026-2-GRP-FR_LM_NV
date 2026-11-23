@@ -14,6 +14,11 @@ const INCLUIR_COTIZACION = {
       fecha: true,
       horaInicio: true,
       horaFin: true,
+      // para revisar la cotización: cantidad de personas, lugar y requerimientos técnicos
+      cantidadPersonas: true,
+      lugar: true,
+      espacio: { select: { id: true, nombre: true, ubicacion: true } },
+      requerimientosTecnicos: true,
       cliente: { select: { id: true, nombre: true } }
     }
   },
@@ -158,7 +163,11 @@ function aRespuesta(cotizacion) {
       fecha: textoFecha(solicitud.fecha),
       horaInicio,
       horaFin,
-      horasEvento
+      horasEvento,
+      cantidadPersonas: solicitud.cantidadPersonas,
+      lugar: solicitud.lugar,
+      espacio: solicitud.espacio,
+      requerimientosTecnicos: solicitud.requerimientosTecnicos
     },
     detalles: detalles.map(({ servicio, versionServicio }) => lineaDetalle(servicio, versionServicio, horasEvento))
   };

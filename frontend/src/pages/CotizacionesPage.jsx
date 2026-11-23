@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
+import { textoEspacio } from '../components/SelectorLugar.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Badge from '../components/ui/Badge.jsx';
@@ -57,6 +58,13 @@ function ClienteEvento({ cliente, tipoEvento }) {
 }
 
 const fechaEvento = (fecha) => (fecha ? formatearFecha(fecha) : '—');
+
+// Datos de la solicitud que sirven para revisar la cotización (Producción y Comercial y Gerencia)
+const datosParaRevisar = (s) => [
+  ['Cantidad de personas', s.cantidadPersonas ?? '—'],
+  ['Lugar', s.espacio ? textoEspacio(s.espacio) : s.lugar || '—'],
+  ['Requerimientos técnicos', s.requerimientosTecnicos || '—']
+];
 
 // Solicitudes listas para cotizar (registradas, con la fecha habilitada y sin cotización activa)
 const columnasPorCotizar = [
@@ -224,6 +232,7 @@ function DetalleCotizacion({ cotizacion: c, user }) {
         ['Horario', formatearHorario(solicitud) || '—'],
         // horas guardadas al cotizar; pueden diferir del horario actual si la solicitud se editó
         ['Horas cotizadas', `${solicitud.horasEvento} h`],
+        ...datosParaRevisar(solicitud),
         ['Registrada', new Date(c.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })]
       ]} />
       <DetalleCalculo detalles={c.detalles} total={c.total} />
@@ -284,7 +293,8 @@ function CotizarSolicitud({ solicitud: s, catalogo, errorCatalogo, onEnviada }) 
         ['Tipo de evento', s.tipoEvento || '—'],
         ['Fecha', fechaEvento(s.fecha)],
         ['Horario', formatearHorario(s) || '—'],
-        ['Horas del evento', calculo ? `${calculo.solicitud.horasEvento} h` : '—']
+        ['Horas del evento', calculo ? `${calculo.solicitud.horasEvento} h` : '—'],
+        ...datosParaRevisar(s)
       ]} />
       {errorCatalogo && <Aviso tipo="error">{errorCatalogo}</Aviso>}
       {excluidos.length > 0 && (
