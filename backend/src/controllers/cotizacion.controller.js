@@ -16,6 +16,14 @@ export async function listar(req, res, next) {
   }
 }
 
+export async function listarPorCotizar(_req, res, next) {
+  try {
+    res.json(await cotizacionService.listarPorCotizar());
+  } catch (error) {
+    next(error);
+  }
+}
+
 export async function obtener(req, res, next) {
   try {
     res.json(await cotizacionService.obtenerPorId(req.params.id));

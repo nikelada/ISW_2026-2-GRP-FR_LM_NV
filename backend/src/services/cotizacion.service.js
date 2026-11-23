@@ -49,7 +49,7 @@ function lineaDetalle(servicio, version, horasEvento) {
   };
 }
 
-// Solo se cotizan solicitudes con todos sus datos y que aún no son eventos confirmados
+// Solo se cotizan solicitudes registradas, con la fecha habilitada y que aún no son eventos confirmados
 function asegurarSolicitudCotizable(solicitud) {
   if (solicitud.estado === 'pendiente') {
     throw Object.assign(new Error('La solicitud tiene datos pendientes; complétala antes de cotizar.'), {
@@ -60,6 +60,25 @@ function asegurarSolicitudCotizable(solicitud) {
   if (solicitud.estado !== 'registrada') {
     throw Object.assign(new Error('La solicitud ya es un evento confirmado; no se puede cotizar.'), { status: 409 });
   }
+  if (!solicitud.fechaHabilitada) {
+    throw Object.assign(new Error('La fecha del evento no está habilitada; revísala en Solicitudes antes de cotizar.'), {
+      status: 409
+    });
+  }
+}
+
+// Punto de entrada de la cotización pendiente: registradas, con la fecha habilitada y sin una cotización activa
+export async function listarPorCotizar() {
+  const solicitudes = await prisma.solicitud.findMany({
+    where: {
+      estado: 'registrada',
+      fechaHabilitada: true,
+      cotizaciones: { none: { estado: { notIn: ESTADOS_CERRADOS } } }
+    },
+    include: solicitudService.INCLUIR_SOLICITUD,
+    orderBy: [{ fecha: 'asc' }, { horaInicio: 'asc' }]
+  });
+  return solicitudes.map(solicitudService.aRespuesta);
 }
 
 // Servicios en el mismo orden pedido; todos deben existir, estar activos y tener precio vigente

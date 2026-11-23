@@ -8,6 +8,9 @@ export function listar({ estado = '', solicitudId = '' } = {}) {
   return api.get(`/cotizaciones${query ? `?${query}` : ''}`);
 }
 
+// Solicitudes registradas, con la fecha habilitada y sin cotización activa
+export const listarPorCotizar = () => api.get('/cotizaciones/por-cotizar');
+
 export const obtener = (id) => api.get(`/cotizaciones/${id}`);
 
 // Muestra el detalle y el total sin guardar

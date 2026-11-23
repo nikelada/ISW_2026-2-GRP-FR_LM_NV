@@ -1,18 +1,16 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import DataTable from '../components/DataTable.jsx';
 import EncabezadoPagina from '../components/EncabezadoPagina.jsx';
 import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Boton from '../components/ui/Boton.jsx';
-import Campo from '../components/ui/Campo.jsx';
 import ListaDatos from '../components/ui/ListaDatos.jsx';
 import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
 import * as cotizacionService from '../services/cotizacionService.js';
 import * as servicioService from '../services/servicioService.js';
-import * as solicitudService from '../services/solicitudService.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 import { esProduccion } from '../utils/roles.js';
 
@@ -33,65 +31,92 @@ const ESTADOS = {
   sin_respuesta: { texto: 'Sin respuesta del cliente', color: 'amarillo' }
 };
 
+// Las dos vistas de la página
+const VISTAS = {
+  cotizar: 'Cotización pendiente',
+  aprobar: 'Aprobación pendiente'
+};
+
 const LABEL_TIPO_PRECIO = { fijo: 'Precio fijo', por_hora: 'Por hora' };
 // AAAA-MM-DD (como lo manda el backend) a dd-mm-aaaa
 const fechaDDMMAAAA = (fecha) => fecha.split('-').reverse().join('-');
-const CHECK = 'flex items-start gap-2 text-sm font-normal text-stone-800';
+const sinResultados = () => Promise.resolve([]);
 
 function EstadoCotizacion({ estado }) {
   const { texto, color } = ESTADOS[estado] || { texto: estado, color: 'azul' };
   return <Badge color={color} data-estado={estado}>{texto}</Badge>;
 }
 
-const columnas = [
-  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (c) => `#${c.id}` },
-  {
-    campo: 'cliente',
-    titulo: 'Cliente / evento',
-    render: (c) => (
-      <>
-        <strong>{c.solicitud.cliente}</strong>
-        <small className="block text-stone-500">{c.solicitud.tipoEvento || 'Sin tipo de evento'}</small>
-      </>
-    )
-  },
-  {
-    campo: 'fecha',
-    titulo: 'Fecha del evento',
-    className: 'whitespace-nowrap',
-    render: (c) => (c.solicitud.fecha ? formatearFecha(c.solicitud.fecha) : '—')
-  },
-  { campo: 'total', titulo: 'Total', className: 'whitespace-nowrap', render: (c) => formatoPrecio.format(c.total) },
-  { campo: 'estado', titulo: 'Estado', render: (c) => <EstadoCotizacion estado={c.estado} /> }
+function ClienteEvento({ cliente, tipoEvento }) {
+  return (
+    <>
+      <strong>{cliente}</strong>
+      <small className="block text-stone-500">{tipoEvento || 'Sin tipo de evento'}</small>
+    </>
+  );
+}
+
+const fechaEvento = (fecha) => (fecha ? formatearFecha(fecha) : '—');
+
+// Solicitudes listas para cotizar (registradas, con la fecha habilitada y sin cotización activa)
+const columnasPorCotizar = [
+  { campo: 'codigo', titulo: 'Solicitud', className: 'whitespace-nowrap text-stone-500' },
+  { campo: 'cliente', titulo: 'Cliente / evento', render: (s) => <ClienteEvento cliente={s.cliente.nombre} tipoEvento={s.tipoEvento} /> },
+  { campo: 'fecha', titulo: 'Fecha del evento', className: 'whitespace-nowrap', render: (s) => fechaEvento(s.fecha) }
 ];
 
-// Cotizaciones registradas: listado con filtro por estado, detalle del cálculo y creación
+// Cotizaciones que esperan la revisión de Gerencia
+const columnasPorAprobar = [
+  { campo: 'id', titulo: 'N°', className: 'text-stone-500', render: (c) => `#${c.id}` },
+  { campo: 'cliente', titulo: 'Cliente / evento', render: (c) => <ClienteEvento cliente={c.solicitud.cliente} tipoEvento={c.solicitud.tipoEvento} /> },
+  { campo: 'fecha', titulo: 'Fecha del evento', className: 'whitespace-nowrap', render: (c) => fechaEvento(c.solicitud.fecha) },
+  { campo: 'total', titulo: 'Total', className: 'whitespace-nowrap', render: (c) => formatoPrecio.format(c.total) }
+];
+
+// Producción y Comercial ve las solicitudes por cotizar y las cotizaciones por aprobar;
+// Gerencia solo las cotizaciones por aprobar.
 export default function CotizacionesPage({ user, params }) {
-  const puedeCrear = esProduccion(user);
-  const [filtro, setFiltro] = useState('');
+  const puedeCotizar = esProduccion(user);
+  const idInicial = Number(params.get('id')) || null;
+  const [vista, setVista] = useState(puedeCotizar && !idInicial ? 'cotizar' : 'aprobar');
   const [busqueda, setBusqueda] = useState('');
-  const [creando, setCreando] = useState(false);
-  const [seleccionadaId, setSeleccionadaId] = useState(Number(params.get('id')) || null);
-  const { datos: cotizaciones, cargando, error, recargar } = useFetch(
-    useCallback(() => cotizacionService.listar({ estado: filtro }), [filtro])
-  );
-  const seleccionada = cotizaciones.find((c) => c.id === seleccionadaId) || null;
-  // Igual que en Solicitudes: busca por cliente o tipo de evento sobre lo ya cargado
+  const [seleccionadoId, setSeleccionadoId] = useState(idInicial);
+  const [aviso, setAviso] = useState(null);
+
+  const porCotizar = useFetch(useCallback(() => (puedeCotizar ? cotizacionService.listarPorCotizar() : sinResultados()), [puedeCotizar]));
+  const porAprobar = useFetch(useCallback(() => cotizacionService.listar({ estado: 'pendiente_revision' }), []));
+  const catalogo = useFetch(useCallback(() => (puedeCotizar ? servicioService.listar() : sinResultados()), [puedeCotizar]));
+
+  const enCotizar = vista === 'cotizar';
+  const lista = enCotizar ? porCotizar : porAprobar;
   const texto = busqueda.trim().toLowerCase();
   const visibles = texto
-    ? cotizaciones.filter((c) => `${c.solicitud.cliente} ${c.solicitud.tipoEvento || ''}`.toLowerCase().includes(texto))
-    : cotizaciones;
+    ? lista.datos.filter((fila) => {
+      const { cliente, tipoEvento } = enCotizar ? { cliente: fila.cliente.nombre, tipoEvento: fila.tipoEvento } : fila.solicitud;
+      return `${cliente} ${tipoEvento || ''}`.toLowerCase().includes(texto);
+    })
+    : lista.datos;
+  const seleccionado = lista.datos.find((fila) => fila.id === seleccionadoId) || null;
 
-  function verCotizacion(id) {
-    setCreando(false);
-    setFiltro('');
-    setBusqueda('');
-    setSeleccionadaId(id);
+  function cambiarVista(nueva) {
+    setVista(nueva);
+    setSeleccionadoId(null);
+    setAviso(null);
   }
 
-  function alGuardar(creada) {
-    verCotizacion(creada.id);
-    recargar();
+  function seleccionar(fila) {
+    setSeleccionadoId(fila.id);
+    setAviso(null);
+  }
+
+  // La solicitud sale de "Cotización pendiente" y su cotización pasa a "Aprobación pendiente"
+  function alEnviar(creada) {
+    setVista('aprobar');
+    setBusqueda('');
+    setSeleccionadoId(creada.id);
+    setAviso(`Cotización de ${creada.solicitud.cliente} enviada a aprobación de Gerencia.`);
+    porCotizar.recargar();
+    porAprobar.recargar();
   }
 
   return (
@@ -99,49 +124,51 @@ export default function CotizacionesPage({ user, params }) {
       <EncabezadoPagina
         antetitulo="Producción y Comercial"
         titulo="Cotizaciones"
-        descripcion="Cotizaciones de las solicitudes, calculadas con los precios vigentes del catálogo."
-      >
-        {puedeCrear && !creando && <Boton onClick={() => setCreando(true)}>Nueva cotización</Boton>}
-      </EncabezadoPagina>
+        descripcion="Solicitudes listas para cotizar y cotizaciones que esperan la aprobación de Gerencia."
+      />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <Panel>
           <div className="flex gap-2.5 border-b border-stone-200 p-3.5">
-            <input type="search" placeholder="Buscar por cliente o tipo de evento" aria-label="Buscar cotizaciones" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-            <select className="w-auto" aria-label="Filtrar por estado" value={filtro} onChange={(e) => setFiltro(e.target.value)}>
-              <option value="">Todos los estados</option>
-              {Object.entries(ESTADOS).map(([valor, { texto }]) => (
-                <option key={valor} value={valor}>{texto}</option>
-              ))}
-            </select>
+            <input type="search" placeholder="Buscar por cliente o tipo de evento" aria-label="Buscar" value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+            {puedeCotizar && (
+              <select className="w-auto" aria-label="Ver" value={vista} onChange={(e) => cambiarVista(e.target.value)}>
+                {Object.entries(VISTAS).map(([valor, titulo]) => <option key={valor} value={valor}>{titulo}</option>)}
+              </select>
+            )}
           </div>
-          {error && <Aviso tipo="error" className="m-3.5">{error}</Aviso>}
-          {cargando && !cotizaciones.length ? (
+          {lista.error && <Aviso tipo="error" className="m-3.5">{lista.error}</Aviso>}
+          {lista.cargando && !lista.datos.length ? (
             <Vacio>Cargando…</Vacio>
           ) : (
             <DataTable
-              columnas={columnas}
+              columnas={enCotizar ? columnasPorCotizar : columnasPorAprobar}
               datos={visibles}
               vacio={
                 texto
-                  ? 'No hay cotizaciones que coincidan con la búsqueda.'
-                  : filtro
-                    ? 'No hay cotizaciones con este estado.'
-                    : 'Todavía no hay cotizaciones registradas.'
+                  ? 'No hay resultados para la búsqueda.'
+                  : enCotizar
+                    ? 'No hay solicitudes pendientes de cotizar.'
+                    : 'No hay cotizaciones pendientes de aprobación.'
               }
-              seleccionadoId={seleccionadaId}
-              onSeleccionar={(c) => { setCreando(false); setSeleccionadaId(c.id); }}
+              seleccionadoId={seleccionadoId}
+              onSeleccionar={seleccionar}
             />
           )}
         </Panel>
         <Panel lateral>
-          {creando ? (
-            <NuevaCotizacion onCancelar={() => setCreando(false)} onGuardada={alGuardar} onVerCotizacion={verCotizacion} />
-          ) : seleccionada ? (
-            <DetalleCotizacion key={seleccionada.id} cotizacion={seleccionada} user={user} />
-          ) : (
+          {!seleccionado ? (
             <>
               <Antetitulo>Detalle</Antetitulo>
-              <Vacio>Selecciona una cotización para ver el detalle del cálculo.</Vacio>
+              <Vacio>{enCotizar ? 'Selecciona una solicitud para ver su cotización.' : 'Selecciona una cotización para ver el detalle del cálculo.'}</Vacio>
+            </>
+          ) : enCotizar ? (
+            catalogo.cargando
+              ? <Vacio>Cargando…</Vacio>
+              : <CotizarSolicitud key={seleccionado.id} solicitud={seleccionado} catalogo={catalogo.datos} errorCatalogo={catalogo.error} onEnviada={alEnviar} />
+          ) : (
+            <>
+              {aviso && <Aviso tipo="success">{aviso}</Aviso>}
+              <DetalleCotizacion key={seleccionado.id} cotizacion={seleccionado} user={user} />
             </>
           )}
         </Panel>
@@ -150,15 +177,21 @@ export default function CotizacionesPage({ user, params }) {
   );
 }
 
-// Cada servicio: arriba la versión del precio (fecha, tipo y precio unitario) y abajo, aparte, el cálculo
-function DetalleCalculo({ detalles, total }) {
+// Cada servicio: arriba la versión del precio (fecha, tipo y precio unitario) y abajo, aparte, el cálculo.
+// Con onQuitar, cada servicio se puede quitar de la cotización.
+function DetalleCalculo({ detalles, total, onQuitar, deshabilitado = false }) {
   return (
     <section className="border-t border-stone-200 pt-4" aria-label="Servicios cotizados">
       <Antetitulo className="mb-2.5">Servicios cotizados</Antetitulo>
       <ul className="grid gap-4 text-sm">
         {detalles.map((d) => (
           <li key={d.servicioId}>
-            <strong className="block">{d.nombre}</strong>
+            <div className="flex items-start justify-between gap-3">
+              <strong className="block">{d.nombre}</strong>
+              {onQuitar && (
+                <Boton variante="enlace" disabled={deshabilitado} onClick={() => onQuitar(d.servicioId)}>Quitar</Boton>
+              )}
+            </div>
             {d.vigenciaDesde && (
               <small className="block text-stone-500">Última actualización: {fechaDDMMAAAA(d.vigenciaDesde)}</small>
             )}
@@ -189,7 +222,7 @@ function DetalleCotizacion({ cotizacion: c, user }) {
       <div className="mb-3"><EstadoCotizacion estado={c.estado} /></div>
       <ListaDatos datos={[
         ['Solicitud', `#${solicitud.id} · ${solicitud.tipoEvento || 'Sin tipo de evento'}`],
-        ['Fecha', solicitud.fecha ? formatearFecha(solicitud.fecha) : '—'],
+        ['Fecha', fechaEvento(solicitud.fecha)],
         ['Horario', formatearHorario(solicitud) || '—'],
         // horas guardadas al cotizar; pueden diferir del horario actual si la solicitud se editó
         ['Horas cotizadas', `${solicitud.horasEvento} h`],
@@ -204,142 +237,109 @@ function DetalleCotizacion({ cotizacion: c, user }) {
   );
 }
 
-// RF-07: se elige la solicitud y sus servicios, se ve el cálculo y recién ahí se puede guardar
-function NuevaCotizacion({ onCancelar, onGuardada, onVerCotizacion }) {
-  const { datos: solicitudes, cargando: cargandoSolicitudes, error: errorSolicitudes } = useFetch(
-    useCallback(() => solicitudService.listar('registrada'), [])
-  );
-  const { datos: catalogo, cargando: cargandoCatalogo, error: errorCatalogo } = useFetch(
-    useCallback(() => servicioService.listar(), [])
-  );
-  const [solicitudId, setSolicitudId] = useState('');
-  const [servicios, setServicios] = useState([]);
-  const [excluidos, setExcluidos] = useState([]);
+// RF-07: la cotización se muestra ya calculada con los servicios de la solicitud; se pueden quitar o
+// agregar servicios (el total se recalcula solo) y después se envía a aprobación de Gerencia.
+// Cambiar los servicios aquí no modifica la solicitud.
+function CotizarSolicitud({ solicitud: s, catalogo, errorCatalogo, onEnviada }) {
+  const disponibles = new Set(catalogo.map((servicio) => servicio.id));
+  const propios = s.servicios || [];
+  // Los servicios de la solicitud que ya no están en el catálogo no se pueden cotizar
+  const [excluidos] = useState(() => propios.filter((servicio) => !disponibles.has(servicio.id)).map((servicio) => servicio.nombre));
+  const [servicios, setServicios] = useState(() => propios.filter((servicio) => disponibles.has(servicio.id)).map((servicio) => servicio.id));
   const [calculo, setCalculo] = useState(null);
-  const [errores, setErrores] = useState({});
-  const [aviso, setAviso] = useState(null);
-  const [procesando, setProcesando] = useState(false);
-  const listo = !cargandoSolicitudes && !cargandoCatalogo;
+  const [calculando, setCalculando] = useState(false);
+  const [error, setError] = useState('');
+  const [enviando, setEnviando] = useState(false);
+  const [tipoParaAgregar, setTipoParaAgregar] = useState('');
+  const [servicioParaAgregar, setServicioParaAgregar] = useState('');
 
-  // Cualquier cambio invalida el cálculo: hay que volver a calcular antes de guardar
-  function limpiarCalculo() {
-    setCalculo(null);
-    setAviso(null);
-    setErrores({});
+  // Cada cambio en los servicios vuelve a calcular (con los precios vigentes)
+  useEffect(() => {
+    if (!servicios.length) {
+      setCalculo(null);
+      return undefined;
+    }
+    let vigente = true;
+    setCalculando(true);
+    setError('');
+    cotizacionService.calcular({ solicitudId: s.id, servicios })
+      .then((resultado) => { if (vigente) setCalculo(resultado); })
+      .catch((e) => { if (vigente) { setCalculo(null); setError(e.message); } })
+      .finally(() => { if (vigente) setCalculando(false); });
+    return () => { vigente = false; };
+  }, [s.id, servicios]);
+
+  const activos = catalogo.filter((servicio) => servicio.tipoServicio?.activo !== false && !servicios.includes(servicio.id));
+  const tipos = Array.from(new Map(activos.map((servicio) => [servicio.tipoServicio.id, servicio.tipoServicio])).values())
+    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
+  const delTipo = activos.filter((servicio) => servicio.tipoServicioId === Number(tipoParaAgregar));
+  const ocupado = calculando || enviando;
+
+  function quitar(id) {
+    setServicios((actuales) => actuales.filter((x) => x !== id));
   }
 
-  // Se marcan los servicios que ya tiene la solicitud, si siguen disponibles en el catálogo
-  function elegirSolicitud(id) {
-    setSolicitudId(id);
-    const propios = solicitudes.find((s) => String(s.id) === id)?.servicios || [];
-    const disponibles = new Set(catalogo.map((s) => s.id));
-    setServicios(propios.filter((s) => disponibles.has(s.id)).map((s) => s.id));
-    setExcluidos(propios.filter((s) => !disponibles.has(s.id)).map((s) => s.nombre));
-    limpiarCalculo();
+  function agregar() {
+    setServicios((actuales) => [...actuales, Number(servicioParaAgregar)]);
+    setTipoParaAgregar('');
+    setServicioParaAgregar('');
   }
 
-  function alternarServicio(id, marcado) {
-    setServicios((actuales) => (marcado ? [...actuales, id] : actuales.filter((x) => x !== id)));
-    limpiarCalculo();
-  }
-
-  function mostrarError(e) {
-    setErrores(e.data?.errores || {});
-    setAviso({ mensaje: e.message, faltantes: e.data?.faltantes, cotizacionActiva: e.data?.cotizacionActiva });
-  }
-
-  async function ejecutar(accion) {
-    setProcesando(true);
-    setAviso(null);
-    setErrores({});
+  async function enviar() {
+    setEnviando(true);
+    setError('');
     try {
-      await accion();
+      onEnviada(await cotizacionService.crear({ solicitudId: s.id, servicios }));
     } catch (e) {
-      mostrarError(e);
-    } finally {
-      setProcesando(false);
+      setError(e.message);
+      setEnviando(false);
     }
   }
 
-  const datos = () => ({ solicitudId: Number(solicitudId), servicios });
-  const calcular = () => ejecutar(async () => {
-    setCalculo(null);
-    setCalculo(await cotizacionService.calcular(datos()));
-  });
-  const guardar = () => ejecutar(async () => onGuardada(await cotizacionService.crear(datos())));
-
   return (
     <>
-      <Antetitulo className="mb-2">Nueva cotización</Antetitulo>
-      <p className="mb-4 text-xs text-stone-500">Elige una solicitud registrada y los servicios a cotizar. Se usan los precios vigentes del catálogo.</p>
-      {(errorSolicitudes || errorCatalogo) && <Aviso tipo="error">{errorSolicitudes || errorCatalogo}</Aviso>}
+      <Antetitulo className="mb-2">Solicitud {s.codigo}</Antetitulo>
+      <h2 className="mb-4 text-xl font-bold">{s.cliente.nombre}</h2>
+      <ListaDatos datos={[
+        ['Tipo de evento', s.tipoEvento || '—'],
+        ['Fecha', fechaEvento(s.fecha)],
+        ['Horario', formatearHorario(s) || '—'],
+        ['Horas del evento', calculo ? `${calculo.solicitud.horasEvento} h` : '—']
+      ]} />
+      {errorCatalogo && <Aviso tipo="error">{errorCatalogo}</Aviso>}
+      {excluidos.length > 0 && (
+        <Aviso tipo="warning">No se incluyeron porque ya no están disponibles en el catálogo: {excluidos.join(', ')}.</Aviso>
+      )}
 
-      <div className="grid gap-4">
-        <Campo etiqueta="Solicitud" error={errores.solicitudId}>
-          <select name="solicitudId" value={solicitudId} disabled={!listo} onChange={(e) => elegirSolicitud(e.target.value)}>
-            <option value="">{listo ? 'Selecciona una solicitud' : 'Cargando…'}</option>
-            {solicitudes.map((s) => (
-              <option key={s.id} value={s.id}>
-                #{s.id} · {s.cliente?.nombre} · {s.tipoEvento} · {formatearFecha(s.fecha)}
-              </option>
-            ))}
+      {calculo ? (
+        <DetalleCalculo detalles={calculo.detalles} total={calculo.total} onQuitar={quitar} deshabilitado={ocupado} />
+      ) : !servicios.length ? (
+        <Vacio>Agrega al menos un servicio para cotizar.</Vacio>
+      ) : calculando ? (
+        <Vacio>Calculando…</Vacio>
+      ) : null}
+
+      <div className="mt-4 grid gap-2.5 border-t border-stone-200 pt-4">
+        <Antetitulo>Agregar servicio</Antetitulo>
+        <select aria-label="Tipo de servicio para agregar" value={tipoParaAgregar} disabled={ocupado} onChange={(e) => { setTipoParaAgregar(e.target.value); setServicioParaAgregar(''); }}>
+          <option value="">Selecciona un tipo de servicio</option>
+          {tipos.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.nombre}</option>)}
+        </select>
+        <div className="flex items-start gap-2.5">
+          <select className="h-10 min-w-0 flex-1" aria-label="Servicio para agregar" value={servicioParaAgregar} disabled={!tipoParaAgregar || ocupado} onChange={(e) => setServicioParaAgregar(e.target.value)}>
+            <option value="">Selecciona un servicio</option>
+            {delTipo.map((servicio) => <option key={servicio.id} value={servicio.id}>{servicio.nombre}</option>)}
           </select>
-        </Campo>
-        {listo && !solicitudes.length && <p className="text-xs text-stone-500">No hay solicitudes registradas para cotizar.</p>}
-
-        {solicitudId && (
-          <fieldset className="grid gap-2">
-            <legend className="mb-1.5 text-xs font-semibold text-stone-600">Servicios</legend>
-            {excluidos.length > 0 && (
-              <Aviso tipo="warning">No se marcaron porque ya no están disponibles en el catálogo: {excluidos.join(', ')}.</Aviso>
-            )}
-            {catalogo.map((s) => (
-              <label key={s.id} className={CHECK}>
-                <input type="checkbox" name={`servicio-${s.id}`} checked={servicios.includes(s.id)} onChange={(e) => alternarServicio(s.id, e.target.checked)} />
-                <span>
-                  {s.nombre}
-                  <small className="block text-stone-500">
-                    {LABEL_TIPO_PRECIO[s.versionActiva?.tipoPrecio] || '—'} · {s.versionActiva ? formatoPrecio.format(s.versionActiva.precio) : '—'}
-                  </small>
-                </span>
-              </label>
-            ))}
-            {errores.servicios && <span className="text-xs font-medium text-red-700" data-campo-error>{errores.servicios}</span>}
-          </fieldset>
-        )}
+          <Boton variante="secundario" className="h-10 shrink-0" disabled={!servicioParaAgregar || ocupado} onClick={agregar}>Agregar</Boton>
+        </div>
       </div>
 
-      {aviso && (
-        <Aviso tipo="error" className="my-3.5">
-          <p>{aviso.mensaje}</p>
-          {aviso.faltantes?.length > 0 && <ul>{aviso.faltantes.map((f) => <li key={f}>{f}</li>)}</ul>}
-          {aviso.cotizacionActiva && (
-            <p>
-              <Boton variante="enlace" onClick={() => onVerCotizacion(aviso.cotizacionActiva.id)}>
-                Ver cotización #{aviso.cotizacionActiva.id}
-              </Boton>
-            </p>
-          )}
-        </Aviso>
-      )}
+      {error && <Aviso tipo="error" className="mt-3.5">{error}</Aviso>}
 
-      {calculo && (
-        <div className="mt-4">
-          <ListaDatos datos={[
-            ['Horario', formatearHorario(calculo.solicitud) || '—'],
-            ['Horas del evento', `${calculo.solicitud.horasEvento} h`]
-          ]} />
-          <DetalleCalculo detalles={calculo.detalles} total={calculo.total} />
-        </div>
-      )}
-
-      <div className="mt-5 flex flex-wrap gap-2.5">
-        {calculo ? (
-          <Boton onClick={guardar} disabled={procesando}>Guardar cotización</Boton>
-        ) : (
-          <Boton onClick={calcular} disabled={procesando || !solicitudId || !servicios.length}>Calcular</Boton>
-        )}
-        <Boton variante="secundario" onClick={onCancelar}>Cancelar</Boton>
+      <div className="mt-5">
+        <Boton className="w-full" onClick={enviar} disabled={!calculo || !servicios.length || ocupado}>
+          <span>{enviando ? 'Enviando…' : 'Enviar a aprobación'}</span><span aria-hidden="true">→</span>
+        </Boton>
       </div>
     </>
   );
