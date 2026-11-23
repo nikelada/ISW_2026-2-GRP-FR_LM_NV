@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import EventosLayout from './components/EventosLayout.jsx';
+import AbonosPage from './pages/AbonosPage.jsx';
 import AuthPage from './pages/AuthPage.jsx';
 import CalendarioPage from './pages/CalendarioPage.jsx';
 import CambiosPage from './pages/CambiosPage.jsx';
@@ -26,6 +27,7 @@ const SECCIONES = [
   { clave: 'historial', titulo: 'Historial', Pagina: HistorialPage, roles: ['usuario', 'admin'] },
   { clave: 'servicios', titulo: 'Servicios', Pagina: ServiciosPage, roles: ['usuario', 'manager', 'admin'] },
   { clave: 'cotizaciones', titulo: 'Cotizaciones', Pagina: CotizacionesPage, roles: ['usuario', 'manager', 'admin'] },
+  { clave: 'abonos', titulo: 'Abonos', Pagina: AbonosPage, roles: ['usuario', 'admin'] },
   { clave: 'inventario', titulo: 'Inventario', Pagina: InventarioPage, roles: ['manager', 'admin'] },
   { clave: 'ubicaciones', titulo: 'Ubicaciones', Pagina: UbicacionesPage, roles: ['admin'] },
   { clave: 'operaciones', titulo: 'Operaciones', Pagina: OperacionesPage, roles: ['manager', 'admin'] }
