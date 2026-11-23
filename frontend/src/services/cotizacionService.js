@@ -26,3 +26,6 @@ export const solicitarModificaciones = (id, datos) => api.patch(`/cotizaciones/$
 
 // RF-10: Producción y Comercial registra que el cliente aceptó la cotización aprobada
 export const aceptar = (id) => api.patch(`/cotizaciones/${id}/aceptar`);
+
+// RF-10: el cliente no aceptó la cotización aprobada { motivos: [...], detalle? }
+export const rechazar = (id, datos) => api.patch(`/cotizaciones/${id}/rechazar`, datos);

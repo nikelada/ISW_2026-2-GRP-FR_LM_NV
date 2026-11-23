@@ -55,6 +55,15 @@ const MOTIVOS_MODIFICACION = {
   otro: 'Otro'
 };
 const MAXIMO_COMENTARIO = 1000;
+
+// Mismos valores que MotivoRechazo en el schema de Prisma; "No respondió" va solo (queda "sin respuesta")
+const MOTIVOS_RECHAZO = {
+  precio: 'Precio',
+  otra_empresa: 'Seleccionó otra empresa',
+  evento_cancelado: 'Canceló el evento',
+  no_respondio: 'No respondió',
+  otro: 'Otro'
+};
 const fechaHora = (valor) => new Date(valor).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' });
 
 // Lo que pidió Gerencia al solicitar modificaciones (RF-10): motivos, comentario y quién lo pidió
@@ -181,6 +190,18 @@ export default function CotizacionesPage({ user, params }) {
     aprobadas.recargar();
   }
 
+  // El cliente no la aceptó: sale de "Cotización aprobada" y la solicitud vuelve a "Cotización pendiente"
+  function alRechazar(cotizacion) {
+    setSeleccionadoId(null);
+    setAviso(
+      cotizacion.estado === 'sin_respuesta'
+        ? `Cotización de ${cotizacion.solicitud.cliente} registrada sin respuesta del cliente.`
+        : `Cotización de ${cotizacion.solicitud.cliente} rechazada por el cliente.`
+    );
+    aprobadas.recargar();
+    porCotizar.recargar();
+  }
+
   // Gerencia pidió modificaciones: sale de "Revisión pendiente" y vuelve a "Cotización pendiente"
   function alSolicitarModificaciones(cotizacion) {
     setSeleccionadoId(null);
@@ -231,7 +252,7 @@ export default function CotizacionesPage({ user, params }) {
               ? <Vacio>Cargando…</Vacio>
               : <CotizarSolicitud key={seleccionado.id} solicitud={seleccionado} catalogo={catalogo.datos} errorCatalogo={catalogo.error} onEnviada={alEnviar} />
           ) : (
-            <DetalleCotizacion key={seleccionado.id} cotizacion={seleccionado} user={user} onAprobada={alAprobar} onAceptada={alAceptar} onModificacionesSolicitadas={alSolicitarModificaciones} />
+            <DetalleCotizacion key={seleccionado.id} cotizacion={seleccionado} user={user} onAprobada={alAprobar} onAceptada={alAceptar} onRechazada={alRechazar} onModificacionesSolicitadas={alSolicitarModificaciones} />
           )}
         </Panel>
       </div>
@@ -280,7 +301,7 @@ function DetalleCalculo({ detalles, total, accion, onQuitar, deshabilitado = fal
   );
 }
 
-function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada, onModificacionesSolicitadas }) {
+function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada, onRechazada, onModificacionesSolicitadas }) {
   const { solicitud } = c;
   // RF-10: Gerencia revisa las cotizaciones que están en su revisión
   const puedeRevisar = esGerencia(user) && c.estado === 'pendiente_revision';
@@ -293,6 +314,38 @@ function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada, onModi
   const [motivos, setMotivos] = useState([]);
   const [comentario, setComentario] = useState('');
   const [errores, setErrores] = useState({});
+  // Formulario de Producción y Comercial para registrar que el cliente no la aceptó
+  const [rechazando, setRechazando] = useState(false);
+  const [motivosRechazo, setMotivosRechazo] = useState([]);
+  const [detalleRechazo, setDetalleRechazo] = useState('');
+
+  // "No respondió" va solo: al marcarlo se quitan los demás, y al marcar otro se quita "No respondió"
+  function alternarMotivoRechazo(motivo, marcado) {
+    if (!marcado) return setMotivosRechazo((actuales) => actuales.filter((m) => m !== motivo));
+    if (motivo === 'no_respondio') return setMotivosRechazo(['no_respondio']);
+    setMotivosRechazo((actuales) => [...actuales.filter((m) => m !== 'no_respondio'), motivo]);
+  }
+
+  function cancelarRechazo() {
+    setRechazando(false);
+    setMotivosRechazo([]);
+    setDetalleRechazo('');
+    setErrores({});
+    setError('');
+  }
+
+  async function confirmarRechazo() {
+    setProcesando('rechazar');
+    setErrores({});
+    setError('');
+    try {
+      onRechazada(await cotizacionService.rechazar(c.id, { motivos: motivosRechazo, detalle: detalleRechazo }));
+    } catch (e) {
+      setErrores(e.data?.errores || {});
+      setError(e.message);
+      setProcesando('');
+    }
+  }
 
   function alternarMotivo(motivo, marcado) {
     setMotivos((actuales) => (marcado ? [...actuales, motivo] : actuales.filter((m) => m !== motivo)));
@@ -399,10 +452,45 @@ function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada, onModi
           </div>
         </section>
       )}
-      {puedeAceptar && (
-        <Boton className="mt-5 w-full" onClick={aceptar} disabled={Boolean(procesando)}>
-          <span>{procesando === 'aceptar' ? 'Aceptando…' : 'Aceptar cotización'}</span><span aria-hidden="true">→</span>
-        </Boton>
+      {puedeAceptar && !rechazando && (
+        <div className="mt-5 grid gap-2.5">
+          <Boton onClick={aceptar} disabled={Boolean(procesando)}>
+            <span>{procesando === 'aceptar' ? 'Aceptando…' : 'Aceptar cotización'}</span><span aria-hidden="true">→</span>
+          </Boton>
+          <Boton variante="secundario" disabled={Boolean(procesando)} onClick={() => setRechazando(true)}>
+            Rechazar cotización
+          </Boton>
+        </div>
+      )}
+      {puedeAceptar && rechazando && (
+        <section className="mt-5 grid gap-3 border-t border-stone-200 pt-4" aria-label="Rechazar cotización">
+          <Antetitulo>Rechazar cotización</Antetitulo>
+          <fieldset className="grid gap-1.5">
+            <legend className="mb-1 text-xs font-semibold text-stone-600">Motivos</legend>
+            {Object.entries(MOTIVOS_RECHAZO).map(([valor, texto]) => (
+              <label key={valor} className="flex items-center gap-2 text-sm text-stone-800">
+                <input
+                  type="checkbox"
+                  checked={motivosRechazo.includes(valor)}
+                  disabled={Boolean(procesando)}
+                  onChange={(e) => alternarMotivoRechazo(valor, e.target.checked)}
+                />
+                {texto}
+              </label>
+            ))}
+            {errores.motivos && <span className="text-xs font-medium text-red-700" data-campo-error>{errores.motivos}</span>}
+          </fieldset>
+          <Campo etiqueta={`Detalle, opcional (${detalleRechazo.length}/${MAXIMO_COMENTARIO})`} error={errores.detalle}>
+            <textarea rows={4} maxLength={MAXIMO_COMENTARIO} value={detalleRechazo} disabled={Boolean(procesando)} onChange={(e) => setDetalleRechazo(e.target.value)} />
+          </Campo>
+          {error && !Object.keys(errores).length && <Aviso tipo="error" className="mb-0">{error}</Aviso>}
+          <div className="flex gap-2.5">
+            <Boton className="flex-1" disabled={!motivosRechazo.length || Boolean(procesando)} onClick={confirmarRechazo}>
+              <span>{procesando === 'rechazar' ? 'Guardando…' : 'Confirmar rechazo'}</span><span aria-hidden="true">→</span>
+            </Boton>
+            <Boton variante="secundario" disabled={Boolean(procesando)} onClick={cancelarRechazo}>Cancelar</Boton>
+          </div>
+        </section>
       )}
       {/* Gerencia no tiene la sección Solicitudes */}
       {esProduccion(user) && (
