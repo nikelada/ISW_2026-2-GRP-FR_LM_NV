@@ -279,7 +279,10 @@ model Cotizacion {
   total       Int
   // horas del evento al cotizar; null solo en cotizaciones creadas antes de guardar este dato
   horasEvento Int?
+  // día en que el cliente la aceptó (RF-10), solo fecha; los abonos no pueden tener una fecha anterior
+  aceptadaEn  DateTime?           @db.Date
   detalles    DetalleCotizacion[]
+  abonos      Abono[]
   createdAt   DateTime            @default(now()) @db.Timestamp(6)
   updatedAt   DateTime            @updatedAt @db.Timestamp(6)
 
@@ -302,6 +305,22 @@ model DetalleCotizacion {
   @@index([servicioId])
   @@index([versionServicioId])
   @@map("detalles_cotizacion")
+}
+
+// Pago del cliente para una cotización aceptada (RF-08)
+model Abono {
+  id           Int        @id @default(autoincrement())
+  cotizacionId Int
+  cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Restrict)
+  // pesos chilenos, entero (igual que el total de la cotización)
+  monto        Int
+  // día en que el cliente pagó; por defecto hoy, no puede ser anterior a la aceptación
+  fecha        DateTime   @db.Date
+  // cuándo se registró en el sistema
+  createdAt    DateTime   @default(now()) @db.Timestamp(6)
+
+  @@index([cotizacionId])
+  @@map("abonos")
 }
 
 enum TipoRecursoOperativo {
