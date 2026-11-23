@@ -91,12 +91,18 @@ export default function CambiosPrecio({ user }) {
     setProcesando(accion);
     setAviso(null);
     try {
-      if (accion === 'aprobar') await cambioServicioService.aprobar(seleccionado.id);
-      else await cambioServicioService.rechazar(seleccionado.id);
+      const resultado = accion === 'aprobar'
+        ? await cambioServicioService.aprobar(seleccionado.id)
+        : await cambioServicioService.rechazar(seleccionado.id);
+      // Al aprobar, las cotizaciones no aceptadas con este servicio vuelven a Producción y Comercial
+      const devueltas = resultado?.cotizacionesDevueltas || 0;
+      const efecto = devueltas
+        ? ` ${devueltas === 1 ? '1 cotización con este servicio volvió' : `${devueltas} cotizaciones con este servicio volvieron`} a Producción y Comercial.`
+        : '';
       setAviso({
         tipo: 'success',
         texto: accion === 'aprobar'
-          ? `Cambio de precio de «${seleccionado.servicio.nombre}» aprobado.`
+          ? `Cambio de precio de «${seleccionado.servicio.nombre}» aprobado.${efecto}`
           : `Cambio de precio de «${seleccionado.servicio.nombre}» rechazado.`
       });
       setSeleccionado(null);

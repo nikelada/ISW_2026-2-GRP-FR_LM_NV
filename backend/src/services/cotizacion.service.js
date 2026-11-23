@@ -7,6 +7,17 @@ import { textoFecha, textoHora } from './solicitud.service.js';
 // Con estos estados la cotización terminó sin concretarse y se puede cotizar de nuevo la solicitud
 const ESTADOS_CERRADOS = ['rechazada', 'sin_respuesta'];
 
+const formatoPrecio = new Intl.NumberFormat('es-CL', { style: 'currency', currency: 'CLP', maximumFractionDigits: 0 });
+const TIPO_PRECIO_TEXTO = { fijo: 'fijo', por_hora: 'por hora' };
+
+// "Se modificó el precio vigente del servicio Sonido ($50.000 → $60.000)."
+// Si también cambió el tipo de cobro, se indica junto a cada precio: ($50.000 fijo → $15.000 por hora).
+export function textoCambioDePrecio(nombre, anterior, nueva) {
+  const cambiaTipo = anterior.tipoPrecio !== nueva.tipoPrecio;
+  const precio = (version) => `${formatoPrecio.format(version.precio)}${cambiaTipo ? ` ${TIPO_PRECIO_TEXTO[version.tipoPrecio]}` : ''}`;
+  return `Se modificó el precio vigente del servicio ${nombre} (${precio(anterior)} → ${precio(nueva)}).`;
+}
+
 export const INCLUIR_COTIZACION = {
   solicitud: {
     select: {
@@ -75,7 +86,8 @@ function asegurarSolicitudCotizable(solicitud) {
 
 // Punto de entrada de la cotización pendiente: registradas, con la fecha habilitada y sin una cotización activa.
 // También vuelven aquí las que tienen una cotización con modificaciones solicitadas por Gerencia (RF-10);
-// esas traen en `modificacionSolicitada` lo que pidió Gerencia y los servicios que ya tenía la cotización.
+// esas traen en `modificacionSolicitada` lo que pidió Gerencia, los servicios que ya tenía la cotización y
+// `cambiosDePrecio`: los servicios cuyo precio vigente ya no es el que se cotizó (se calcula cada vez).
 export async function listarPorCotizar() {
   const solicitudes = await prisma.solicitud.findMany({
     where: {
@@ -96,7 +108,24 @@ export async function listarPorCotizar() {
           comentarioModificacion: true,
           revisadoPor: true,
           revisadoEn: true,
-          detalles: { select: { servicio: { select: { id: true, nombre: true } } }, orderBy: { id: 'asc' } }
+          detalles: {
+            select: {
+              versionServicio: { select: { id: true, precio: true, tipoPrecio: true } },
+              servicio: {
+                select: {
+                  id: true,
+                  nombre: true,
+                  versiones: {
+                    where: { estado: 'activo' },
+                    orderBy: { vigenciaDesde: 'desc' },
+                    take: 1,
+                    select: { id: true, precio: true, tipoPrecio: true }
+                  }
+                }
+              }
+            },
+            orderBy: { id: 'asc' }
+          }
         }
       }
     },
@@ -111,7 +140,10 @@ export async function listarPorCotizar() {
         comentario: conModificaciones.comentarioModificacion,
         revisadoPor: conModificaciones.revisadoPor,
         revisadoEn: conModificaciones.revisadoEn,
-        servicios: conModificaciones.detalles.map((detalle) => detalle.servicio)
+        servicios: conModificaciones.detalles.map(({ servicio: { id, nombre } }) => ({ id, nombre })),
+        cambiosDePrecio: conModificaciones.detalles
+          .filter(({ servicio, versionServicio }) => servicio.versiones[0] && servicio.versiones[0].id !== versionServicio.id)
+          .map(({ servicio, versionServicio }) => textoCambioDePrecio(servicio.nombre, versionServicio, servicio.versiones[0]))
       }
       : null
   }));
@@ -239,6 +271,25 @@ const revision = (usuario) => ({ revisadoPor: usuario.name, revisadoEn: new Date
 // RF-10: Gerencia aprueba una cotización que está en su revisión
 export function aprobar(id, usuario) {
   return cambiarEstado(id, 'pendiente_revision', 'aprobada', 'Solo se pueden aprobar cotizaciones que están en revisión de Gerencia.', revision(usuario));
+}
+
+// RF-06 y RF-10: cuando Gerencia aprueba un precio nuevo de un servicio, las cotizaciones en revisión o
+// aprobadas que lo incluyen vuelven a Producción y Comercial ("modificaciones solicitadas", motivo
+// "precio desactualizado") con un comentario automático; al reenviarlas se recalculan con los precios
+// vigentes. Las aceptadas, rechazadas o sin respuesta no se tocan, y las que ya tenían modificaciones
+// solicitadas tampoco (ven el cambio en `cambiosDePrecio`). Se llama dentro de la transacción que aprueba
+// el precio y devuelve cuántas cotizaciones volvieron a Producción y Comercial.
+export async function devolverPorCambioDePrecio(transaction, { servicioId, nombre, anterior, nueva, usuario }) {
+  const { count } = await transaction.cotizacion.updateMany({
+    where: { estado: { in: ['pendiente_revision', 'aprobada'] }, detalles: { some: { servicioId } } },
+    data: {
+      estado: 'modificaciones_solicitadas',
+      motivosModificacion: { set: ['precio_desactualizado'] },
+      comentarioModificacion: textoCambioDePrecio(nombre, anterior, nueva),
+      ...revision(usuario)
+    }
+  });
+  return count;
 }
 
 // RF-10: Gerencia solicita modificaciones a Producción y Comercial, con uno o más motivos y un comentario.

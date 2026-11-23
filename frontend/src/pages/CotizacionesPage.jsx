@@ -617,6 +617,12 @@ function CotizarSolicitud({ solicitud: s, catalogo, errorCatalogo, onEnviada }) 
           revisadoEn={modificacion.revisadoEn}
         />
       )}
+      {/* Servicios cuyo precio vigente ya no es el que se cotizó; al reenviar se usan los precios vigentes */}
+      {modificacion?.cambiosDePrecio?.length > 0 && (
+        <Aviso tipo="warning">
+          {modificacion.cambiosDePrecio.map((texto) => <p key={texto}>{texto}</p>)}
+        </Aviso>
+      )}
       {errorCatalogo && <Aviso tipo="error">{errorCatalogo}</Aviso>}
       {excluidos.length > 0 && (
         <Aviso tipo="warning">No se incluyeron porque ya no están disponibles en el catálogo: {excluidos.join(', ')}.</Aviso>

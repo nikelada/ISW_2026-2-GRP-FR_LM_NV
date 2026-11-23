@@ -1,5 +1,6 @@
 import { prisma } from '../config/prisma.js';
 import { fechaActual } from '../utils/fecha.js';
+import { devolverPorCambioDePrecio } from './cotizacion.service.js';
 import * as servicioService from './servicio.service.js';
 
 const ESTADOS = ['pendiente', 'aprobado', 'rechazado'];
@@ -66,11 +67,13 @@ export async function crear(servicioId, datos) {
   return aRespuesta(cambio);
 }
 
-export async function aprobar(id) {
-  const cambioAprobado = await prisma.$transaction(async (transaction) => {
+// Al aprobar, las cotizaciones no aceptadas que tienen el servicio vuelven a Producción y Comercial
+// (ver devolverPorCambioDePrecio); la respuesta indica cuántas en `cotizacionesDevueltas`.
+export async function aprobar(id, usuario) {
+  const { cambioAprobado, cotizacionesDevueltas } = await prisma.$transaction(async (transaction) => {
     const cambio = await transaction.cambioServicio.findUnique({
       where: { id },
-      include: { servicio: { select: { activo: true } } }
+      include: { servicio: { select: { activo: true, nombre: true } } }
     });
     if (!cambio) throw Object.assign(new Error('Cambio de servicio no encontrado.'), { status: 404 });
     if (cambio.estado !== 'pendiente') {
@@ -93,7 +96,7 @@ export async function aprobar(id) {
       where: { id: versionActiva.id },
       data: { estado: 'inactivo', vigenciaHasta: hoy }
     });
-    await transaction.versionServicio.create({
+    const nueva = await transaction.versionServicio.create({
       data: {
         servicioId: cambio.servicioId,
         tipoPrecio: cambio.tipoPrecioNuevo,
@@ -103,13 +106,22 @@ export async function aprobar(id) {
       }
     });
 
-    return transaction.cambioServicio.update({
+    const devueltas = await devolverPorCambioDePrecio(transaction, {
+      servicioId: cambio.servicioId,
+      nombre: cambio.servicio.nombre,
+      anterior: versionActiva,
+      nueva,
+      usuario
+    });
+
+    const aprobado = await transaction.cambioServicio.update({
       where: { id },
       data: { estado: 'aprobado' },
       include: INCLUIR_CAMBIO
     });
+    return { cambioAprobado: aprobado, cotizacionesDevueltas: devueltas };
   });
-  return aRespuesta(cambioAprobado);
+  return { ...aRespuesta(cambioAprobado), cotizacionesDevueltas };
 }
 
 export async function rechazar(id) {

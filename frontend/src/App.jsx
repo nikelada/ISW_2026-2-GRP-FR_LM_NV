@@ -15,7 +15,7 @@ import UbicacionesPage from './pages/UbicacionesPage.jsx';
 import { getCurrentUser } from './services/authService.js';
 import * as cambioService from './services/cambioService.js';
 import * as cotizacionService from './services/cotizacionService.js';
-import { esGerencia } from './utils/roles.js';
+import { esGerencia, esProduccion } from './utils/roles.js';
 import { clearSession, getStoredSession } from './utils/session.js';
 
 // Secciones del menú en el orden del proceso
@@ -82,14 +82,16 @@ export default function App() {
     cambioService.listar('pendiente').then((cambios) => setPendientes(cambios.length)).catch(() => {});
   }, [user, vista]);
 
-  // Igual que Cambios: Gerencia ve cuántas cotizaciones esperan su revisión
+  // Igual que Cambios: Gerencia ve cuántas cotizaciones esperan su revisión y Producción y Comercial
+  // cuántas le devolvieron (modificaciones solicitadas por Gerencia o por un cambio de precio)
   useEffect(() => {
-    if (!esGerencia(user)) {
-      setCotizacionesPendientes(0);
-      return;
-    }
-    cotizacionService.listar({ estado: 'pendiente_revision' })
-      .then((cotizaciones) => setCotizacionesPendientes(cotizaciones.length))
+    const contar = (estado) => cotizacionService.listar({ estado }).then((cotizaciones) => cotizaciones.length);
+    const conteos = [
+      esGerencia(user) ? contar('pendiente_revision') : 0,
+      esProduccion(user) ? contar('modificaciones_solicitadas') : 0
+    ];
+    Promise.all(conteos)
+      .then(([enRevision, devueltas]) => setCotizacionesPendientes(enRevision + devueltas))
       .catch(() => {});
   }, [user, vista]);
 

@@ -27,7 +27,7 @@ export async function crear(req, res, next) {
 
 export async function aprobar(req, res, next) {
   try {
-    res.json(await cambioServicioService.aprobar(req.params.id));
+    res.json(await cambioServicioService.aprobar(req.params.id, req.user));
   } catch (error) {
     next(error);
   }
