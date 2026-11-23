@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import * as cotizacionController from '../controllers/cotizacion.controller.js';
 import { requireAuth } from '../middlewares/auth.middleware.js';
-import { validarCalculo, validarFiltros, validarSolicitudModificaciones } from '../middlewares/cotizacion.middleware.js';
+import { validarCalculo, validarFiltros, validarRechazo, validarSolicitudModificaciones } from '../middlewares/cotizacion.middleware.js';
 import { validarId } from '../middlewares/id.middleware.js';
 import { autorizarRol, ROLES_GERENCIA, ROLES_PRODUCCION } from '../middlewares/rol.middleware.js';
 
@@ -25,5 +25,6 @@ router.patch(
 );
 // RF-10: respuesta del cliente, la registra Producción y Comercial
 router.patch('/:id/aceptar', autorizarRol(ROLES_PRODUCCION), validarId, cotizacionController.aceptar);
+router.patch('/:id/rechazar', autorizarRol(ROLES_PRODUCCION), validarId, validarRechazo, cotizacionController.rechazar);
 
 export default router;

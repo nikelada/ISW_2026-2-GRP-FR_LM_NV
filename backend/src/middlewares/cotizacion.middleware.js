@@ -83,3 +83,31 @@ export function validarSolicitudModificaciones(req, res, next) {
   req.body = { motivos, comentario };
   next();
 }
+
+// Mismos valores que el enum MotivoRechazo del schema de Prisma
+const MOTIVOS_RECHAZO = ['precio', 'otra_empresa', 'evento_cancelado', 'no_respondio', 'otro'];
+
+// RF-10: el cliente no aceptó la cotización: { motivos: [...], detalle? }.
+// Al menos un motivo (sin repetir); "no_respondio" va solo, porque deja la cotización "sin respuesta".
+// El detalle es opcional, de hasta 1000 caracteres.
+export function validarRechazo(req, res, next) {
+  const errores = {};
+  const { motivos } = req.body;
+  const detalle = String(req.body.detalle ?? '').trim();
+
+  if (!Array.isArray(motivos) || !motivos.length) errores.motivos = 'Selecciona al menos un motivo.';
+  else if (motivos.some((motivo) => !MOTIVOS_RECHAZO.includes(motivo))) errores.motivos = 'Hay motivos que no son válidos.';
+  else if (new Set(motivos).size !== motivos.length) errores.motivos = 'No se puede repetir un motivo.';
+  else if (motivos.includes('no_respondio') && motivos.length > 1) {
+    errores.motivos = '"No respondió" no se puede combinar con otros motivos.';
+  }
+
+  if (detalle.length > MAXIMO_COMENTARIO) errores.detalle = `El detalle no puede superar ${MAXIMO_COMENTARIO} caracteres.`;
+
+  if (Object.keys(errores).length) {
+    return res.status(400).json({ message: 'Revisa el rechazo de la cotización.', errores });
+  }
+
+  req.body = { motivos, detalle: detalle || null };
+  next();
+}

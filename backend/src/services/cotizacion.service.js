@@ -253,6 +253,17 @@ export function solicitarModificaciones(id, { motivos, comentario }, usuario) {
   );
 }
 
+// RF-10: Producción y Comercial registra que el cliente no aceptó una cotización aprobada, con los motivos
+// y un detalle opcional. Con "no_respondio" queda "sin respuesta"; con los demás, "rechazada". En ambos casos
+// la solicitud vuelve a "Cotización pendiente" y la fecha sigue disponible.
+export function rechazar(id, { motivos, detalle }) {
+  const estado = motivos.includes('no_respondio') ? 'sin_respuesta' : 'rechazada';
+  return cambiarEstado(id, 'aprobada', estado, 'Solo se pueden rechazar cotizaciones aprobadas por Gerencia.', {
+    motivosRechazo: motivos,
+    detalleRechazo: detalle
+  });
+}
+
 // RF-10: Producción y Comercial registra que el cliente aceptó una cotización aprobada por Gerencia.
 // Se guarda el día de la aceptación: los abonos no pueden tener una fecha anterior.
 export function aceptar(id) {
