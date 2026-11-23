@@ -13,6 +13,7 @@ import OperacionesPage from './pages/OperacionesPage.jsx';
 import UbicacionesPage from './pages/UbicacionesPage.jsx';
 import { getCurrentUser } from './services/authService.js';
 import * as cambioService from './services/cambioService.js';
+import * as cotizacionService from './services/cotizacionService.js';
 import { esGerencia } from './utils/roles.js';
 import { clearSession, getStoredSession } from './utils/session.js';
 
@@ -42,6 +43,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [{ vista, params }, setRuta] = useState(leerHash);
   const [pendientes, setPendientes] = useState(0);
+  const [cotizacionesPendientes, setCotizacionesPendientes] = useState(0);
   const seccionesPermitidas = SECCIONES.filter((s) => s.roles.includes(user?.role));
   const seccionActual =
     seccionesPermitidas.find((s) => s.clave === vista) ?? seccionesPermitidas[0];
@@ -78,6 +80,17 @@ export default function App() {
     cambioService.listar('pendiente').then((cambios) => setPendientes(cambios.length)).catch(() => {});
   }, [user, vista]);
 
+  // Igual que Cambios: Gerencia ve cuántas cotizaciones esperan su revisión
+  useEffect(() => {
+    if (!esGerencia(user)) {
+      setCotizacionesPendientes(0);
+      return;
+    }
+    cotizacionService.listar({ estado: 'pendiente_revision' })
+      .then((cotizaciones) => setCotizacionesPendientes(cotizaciones.length))
+      .catch(() => {});
+  }, [user, vista]);
+
   function navegar(ruta) {
     location.hash = `/${ruta}`;
   }
@@ -94,11 +107,11 @@ export default function App() {
 
   if (!seccionActual) return <p>Este usuario no tiene pestañas disponibles.</p>;
 
-  const secciones = seccionesPermitidas.map((s) =>
-    s.clave === 'cambios' && pendientes
-      ? { ...s, titulo: `Cambios (${pendientes})` }
-      : s
-  );
+  const secciones = seccionesPermitidas.map((s) => {
+    if (s.clave === 'cambios' && pendientes) return { ...s, titulo: `Cambios (${pendientes})` };
+    if (s.clave === 'cotizaciones' && cotizacionesPendientes) return { ...s, titulo: `Cotizaciones (${cotizacionesPendientes})` };
+    return s;
+  });
 
   return (
     <EventosLayout
