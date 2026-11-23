@@ -42,6 +42,8 @@ function lineaDetalle(servicio, version, horasEvento) {
     versionServicioId: version.id,
     tipoPrecio: version.tipoPrecio,
     precio: version.precio,
+    // desde cuándo rige ese precio (AAAA-MM-DD)
+    vigenciaDesde: textoFecha(version.vigenciaDesde),
     ...(porHora && { horas: horasEvento }),
     subtotal: porHora ? version.precio * horasEvento : version.precio
   };

@@ -34,6 +34,8 @@ const ESTADOS = {
 };
 
 const LABEL_TIPO_PRECIO = { fijo: 'Precio fijo', por_hora: 'Por hora' };
+// AAAA-MM-DD (como lo manda el backend) a dd-mm-aaaa
+const fechaDDMMAAAA = (fecha) => fecha.split('-').reverse().join('-');
 const CHECK = 'flex items-start gap-2 text-sm font-normal text-stone-800';
 
 function EstadoCotizacion({ estado }) {
@@ -148,22 +150,25 @@ export default function CotizacionesPage({ user, params }) {
   );
 }
 
-// Servicios con su precio, horas (si es por hora) y subtotal, más el total
+// Cada servicio: arriba la versión del precio (fecha, tipo y precio unitario) y abajo, aparte, el cálculo
 function DetalleCalculo({ detalles, total }) {
   return (
     <section className="border-t border-stone-200 pt-4" aria-label="Servicios cotizados">
       <Antetitulo className="mb-2.5">Servicios cotizados</Antetitulo>
-      <ul className="grid gap-2 text-sm">
+      <ul className="grid gap-4 text-sm">
         {detalles.map((d) => (
-          <li key={d.servicioId} className="flex items-start justify-between gap-3">
-            <span>
-              <strong>{d.nombre}</strong>
-              <small className="block text-stone-500">
-                {LABEL_TIPO_PRECIO[d.tipoPrecio] || d.tipoPrecio} · {formatoPrecio.format(d.precio)}
-                {d.tipoPrecio === 'por_hora' && ` × ${d.horas} h`}
-              </small>
-            </span>
-            <span className="whitespace-nowrap font-medium">{formatoPrecio.format(d.subtotal)}</span>
+          <li key={d.servicioId}>
+            <strong className="block">{d.nombre}</strong>
+            {d.vigenciaDesde && (
+              <small className="block text-stone-500">Última actualización: {fechaDDMMAAAA(d.vigenciaDesde)}</small>
+            )}
+            <small className="block text-stone-500">
+              {LABEL_TIPO_PRECIO[d.tipoPrecio] || d.tipoPrecio} · {formatoPrecio.format(d.precio)}
+            </small>
+            <p className="mt-1.5 flex justify-between gap-3">
+              <span className="text-stone-600">Subtotal</span>
+              <span className="whitespace-nowrap font-medium">{formatoPrecio.format(d.subtotal)}</span>
+            </p>
           </li>
         ))}
       </ul>
