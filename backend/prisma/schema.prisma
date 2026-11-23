@@ -277,6 +277,16 @@ enum MotivoModificacion {
   otro
 }
 
+// Motivos que registra Producción y Comercial cuando el cliente no acepta la cotización (RF-10)
+enum MotivoRechazo {
+  precio
+  otra_empresa
+  evento_cancelado
+  // con este motivo la cotización queda "sin respuesta" en vez de "rechazada"
+  no_respondio
+  otro
+}
+
 // Cotización de una solicitud, calculada con los precios vigentes
 model Cotizacion {
   id          Int                 @id @default(autoincrement())
@@ -294,6 +304,9 @@ model Cotizacion {
   // quién de Gerencia la revisó por última vez (aprobó o solicitó modificaciones) y cuándo
   revisadoPor            String?              @db.VarChar(150)
   revisadoEn             DateTime?            @db.Timestamp(6)
+  // por qué el cliente no la aceptó (RF-10) y un detalle opcional; se muestra en el historial (RF-05)
+  motivosRechazo         MotivoRechazo[]
+  detalleRechazo         String?              @db.VarChar(1000)
   detalles    DetalleCotizacion[]
   abonos      Abono[]
   createdAt   DateTime            @default(now()) @db.Timestamp(6)
