@@ -144,7 +144,7 @@ export default function CotizacionesPage({ user, params }) {
     aprobadas.recargar();
   }
 
-  // Aceptada por el cliente, sale de "Cotización aprobada"; sus abonos se registrarán en Abonos
+  // Aceptada por el cliente, sale de "Cotización aprobada"
   function alAceptar(aceptada) {
     setSeleccionadoId(null);
     setAviso(`Cotización de ${aceptada.solicitud.cliente} aceptada por el cliente.`);

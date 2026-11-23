@@ -204,8 +204,7 @@ export function aprobar(id) {
   return cambiarEstado(id, 'pendiente_revision', 'aprobada', 'Solo se pueden aprobar cotizaciones que están en revisión de Gerencia.');
 }
 
-// RF-10: Producción y Comercial registra que el cliente aceptó una cotización aprobada por Gerencia.
-// Desde aquí se pueden registrar los abonos; el evento se confirma cuando suman el 50% (RF-08 y RF-09).
+// RF-10: Producción y Comercial registra que el cliente aceptó una cotización aprobada por Gerencia
 export function aceptar(id) {
   return cambiarEstado(id, 'aprobada', 'aceptada', 'Solo se pueden aceptar cotizaciones aprobadas por Gerencia.');
 }
