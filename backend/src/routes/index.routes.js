@@ -10,6 +10,7 @@ import servicioRoutes from './servicio.routes.js';
 import cambioServicioRoutes from './cambioServicio.routes.js';
 import inventarioRoutes from './inventario.routes.js';
 import cotizacionRoutes from './cotizacion.routes.js';
+import abonoRoutes from './abono.routes.js';
 import operacionesRoutes from './operaciones.routes.js';
 import ubicacionesRoutes from './ubicaciones.routes.js';
 
@@ -27,6 +28,7 @@ router.use('/operaciones', operacionesRoutes);
 router.use('/ubicaciones', ubicacionesRoutes);
 router.use('/inventario', inventarioRoutes);
 router.use('/cotizaciones', cotizacionRoutes);
+router.use('/abonos', abonoRoutes);
 router.get('/health', (_req, res) => res.json({ status: 'ok', database: 'connected' }));
 
 export default router;
