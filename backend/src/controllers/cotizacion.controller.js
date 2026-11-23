@@ -26,7 +26,15 @@ export async function listarPorCotizar(_req, res, next) {
 
 export async function aprobar(req, res, next) {
   try {
-    res.json(await cotizacionService.aprobar(req.params.id));
+    res.json(await cotizacionService.aprobar(req.params.id, req.user));
+  } catch (error) {
+    next(error);
+  }
+}
+
+export async function solicitarModificaciones(req, res, next) {
+  try {
+    res.json(await cotizacionService.solicitarModificaciones(req.params.id, req.body, req.user));
   } catch (error) {
     next(error);
   }

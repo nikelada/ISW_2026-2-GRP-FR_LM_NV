@@ -57,3 +57,29 @@ export function validarCalculo(req, res, next) {
   req.body = { solicitudId, servicios };
   next();
 }
+
+// Mismos valores que el enum MotivoModificacion del schema de Prisma
+const MOTIVOS_MODIFICACION = ['servicio_no_disponible', 'precio_desactualizado', 'otro'];
+const MAXIMO_COMENTARIO = 1000;
+
+// RF-10: Gerencia solicita modificaciones con { motivos: [...], comentario }.
+// Al menos un motivo (sin repetir) y un comentario obligatorio de hasta 1000 caracteres.
+export function validarSolicitudModificaciones(req, res, next) {
+  const errores = {};
+  const { motivos } = req.body;
+  const comentario = String(req.body.comentario ?? '').trim();
+
+  if (!Array.isArray(motivos) || !motivos.length) errores.motivos = 'Selecciona al menos un motivo.';
+  else if (motivos.some((motivo) => !MOTIVOS_MODIFICACION.includes(motivo))) errores.motivos = 'Hay motivos que no son válidos.';
+  else if (new Set(motivos).size !== motivos.length) errores.motivos = 'No se puede repetir un motivo.';
+
+  if (!comentario) errores.comentario = 'Escribe un comentario para Producción y Comercial.';
+  else if (comentario.length > MAXIMO_COMENTARIO) errores.comentario = `El comentario no puede superar ${MAXIMO_COMENTARIO} caracteres.`;
+
+  if (Object.keys(errores).length) {
+    return res.status(400).json({ message: 'Revisa la solicitud de modificaciones.', errores });
+  }
+
+  req.body = { motivos, comentario };
+  next();
+}

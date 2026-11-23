@@ -73,18 +73,48 @@ function asegurarSolicitudCotizable(solicitud) {
   }
 }
 
-// Punto de entrada de la cotización pendiente: registradas, con la fecha habilitada y sin una cotización activa
+// Punto de entrada de la cotización pendiente: registradas, con la fecha habilitada y sin una cotización activa.
+// También vuelven aquí las que tienen una cotización con modificaciones solicitadas por Gerencia (RF-10);
+// esas traen en `modificacionSolicitada` lo que pidió Gerencia y los servicios que ya tenía la cotización.
 export async function listarPorCotizar() {
   const solicitudes = await prisma.solicitud.findMany({
     where: {
       estado: 'registrada',
       fechaHabilitada: true,
-      cotizaciones: { none: { estado: { notIn: ESTADOS_CERRADOS } } }
+      OR: [
+        { cotizaciones: { none: { estado: { notIn: ESTADOS_CERRADOS } } } },
+        { cotizaciones: { some: { estado: 'modificaciones_solicitadas' } } }
+      ]
     },
-    include: solicitudService.INCLUIR_SOLICITUD,
+    include: {
+      ...solicitudService.INCLUIR_SOLICITUD,
+      cotizaciones: {
+        where: { estado: 'modificaciones_solicitadas' },
+        select: {
+          id: true,
+          motivosModificacion: true,
+          comentarioModificacion: true,
+          revisadoPor: true,
+          revisadoEn: true,
+          detalles: { select: { servicio: { select: { id: true, nombre: true } } }, orderBy: { id: 'asc' } }
+        }
+      }
+    },
     orderBy: [{ fecha: 'asc' }, { horaInicio: 'asc' }]
   });
-  return solicitudes.map(solicitudService.aRespuesta);
+  return solicitudes.map(({ cotizaciones: [conModificaciones], ...solicitud }) => ({
+    ...solicitudService.aRespuesta(solicitud),
+    modificacionSolicitada: conModificaciones
+      ? {
+        cotizacionId: conModificaciones.id,
+        motivos: conModificaciones.motivosModificacion,
+        comentario: conModificaciones.comentarioModificacion,
+        revisadoPor: conModificaciones.revisadoPor,
+        revisadoEn: conModificaciones.revisadoEn,
+        servicios: conModificaciones.detalles.map((detalle) => detalle.servicio)
+      }
+      : null
+  }));
 }
 
 // Servicios en el mismo orden pedido; todos deben existir, estar activos y tener precio vigente
@@ -203,9 +233,24 @@ async function cambiarEstado(id, desde, hacia, mensaje, datos = {}) {
   return obtenerPorId(id);
 }
 
+// Quién de Gerencia revisó la cotización y cuándo (igual que en los cambios de eventos, RF-04)
+const revision = (usuario) => ({ revisadoPor: usuario.name, revisadoEn: new Date() });
+
 // RF-10: Gerencia aprueba una cotización que está en su revisión
-export function aprobar(id) {
-  return cambiarEstado(id, 'pendiente_revision', 'aprobada', 'Solo se pueden aprobar cotizaciones que están en revisión de Gerencia.');
+export function aprobar(id, usuario) {
+  return cambiarEstado(id, 'pendiente_revision', 'aprobada', 'Solo se pueden aprobar cotizaciones que están en revisión de Gerencia.', revision(usuario));
+}
+
+// RF-10: Gerencia solicita modificaciones a Producción y Comercial, con uno o más motivos y un comentario.
+// La cotización vuelve a "Cotización pendiente" para corregirla y reenviarla.
+export function solicitarModificaciones(id, { motivos, comentario }, usuario) {
+  return cambiarEstado(
+    id,
+    'pendiente_revision',
+    'modificaciones_solicitadas',
+    'Solo se pueden solicitar modificaciones de cotizaciones que están en revisión de Gerencia.',
+    { motivosModificacion: motivos, comentarioModificacion: comentario, ...revision(usuario) }
+  );
 }
 
 // RF-10: Producción y Comercial registra que el cliente aceptó una cotización aprobada por Gerencia.
@@ -218,14 +263,32 @@ export function aceptar(id) {
 
 // Recalcula en el servidor y guarda la cotización pendiente de revisión por Gerencia.
 // Una solicitud no puede tener dos cotizaciones activas (solo se recotiza tras rechazo o sin respuesta).
+// Si su cotización tiene modificaciones solicitadas por Gerencia, se actualiza esa misma cotización
+// (servicios, precios vigentes, total y horas) y vuelve a revisión; lo que pidió Gerencia se conserva.
 export async function crear(datos) {
   const calculo = await calcular(datos);
+  const data = {
+    total: calculo.total,
+    horasEvento: calculo.solicitud.horasEvento,
+    detalles: {
+      create: calculo.detalles.map(({ servicioId, versionServicioId }) => ({ servicioId, versionServicioId }))
+    }
+  };
 
-  const creada = await prisma.$transaction(async (transaction) => {
+  const guardada = await prisma.$transaction(async (transaction) => {
     const activa = await transaction.cotizacion.findFirst({
       where: { solicitudId: datos.solicitudId, estado: { notIn: ESTADOS_CERRADOS } },
       select: { id: true, estado: true }
     });
+
+    if (activa?.estado === 'modificaciones_solicitadas') {
+      await transaction.detalleCotizacion.deleteMany({ where: { cotizacionId: activa.id } });
+      return transaction.cotizacion.update({
+        where: { id: activa.id },
+        data: { ...data, estado: 'pendiente_revision' },
+        include: INCLUIR_COTIZACION
+      });
+    }
     if (activa) {
       throw Object.assign(new Error('La solicitud ya tiene una cotización activa.'), {
         status: 409,
@@ -234,17 +297,10 @@ export async function crear(datos) {
     }
 
     return transaction.cotizacion.create({
-      data: {
-        solicitudId: datos.solicitudId,
-        total: calculo.total,
-        horasEvento: calculo.solicitud.horasEvento,
-        detalles: {
-          create: calculo.detalles.map(({ servicioId, versionServicioId }) => ({ servicioId, versionServicioId }))
-        }
-      },
+      data: { ...data, solicitudId: datos.solicitudId },
       include: INCLUIR_COTIZACION
     });
   });
 
-  return aRespuesta(creada);
+  return aRespuesta(guardada);
 }
