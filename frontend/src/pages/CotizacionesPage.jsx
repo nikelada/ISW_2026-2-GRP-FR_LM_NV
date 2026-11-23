@@ -6,6 +6,7 @@ import Antetitulo from '../components/ui/Antetitulo.jsx';
 import Aviso from '../components/ui/Aviso.jsx';
 import Badge from '../components/ui/Badge.jsx';
 import Boton from '../components/ui/Boton.jsx';
+import Campo from '../components/ui/Campo.jsx';
 import ListaDatos from '../components/ui/ListaDatos.jsx';
 import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
@@ -46,6 +47,26 @@ const VACIO_POR_VISTA = {
 };
 
 const LABEL_TIPO_PRECIO = { fijo: 'Precio fijo', por_hora: 'Por hora' };
+
+// Mismos valores que MotivoModificacion en el schema de Prisma
+const MOTIVOS_MODIFICACION = {
+  servicio_no_disponible: 'Servicio no disponible',
+  precio_desactualizado: 'Precio desactualizado',
+  otro: 'Otro'
+};
+const MAXIMO_COMENTARIO = 1000;
+const fechaHora = (valor) => new Date(valor).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' });
+
+// Lo que pidió Gerencia al solicitar modificaciones (RF-10): motivos, comentario y quién lo pidió
+function ModificacionesSolicitadas({ titulo, motivos, comentario, revisadoPor, revisadoEn }) {
+  return (
+    <Aviso tipo="warning" titulo={titulo}>
+      <p>Motivos: {motivos.map((motivo) => MOTIVOS_MODIFICACION[motivo] || motivo).join(', ')}.</p>
+      {comentario && <p className="whitespace-pre-line">"{comentario}"</p>}
+      {revisadoPor && <p className="text-xs">{revisadoPor}{revisadoEn ? ` · ${fechaHora(revisadoEn)}` : ''}</p>}
+    </Aviso>
+  );
+}
 // AAAA-MM-DD (como lo manda el backend) a dd-mm-aaaa
 const fechaDDMMAAAA = (fecha) => fecha.split('-').reverse().join('-');
 const sinResultados = () => Promise.resolve([]);
@@ -76,7 +97,16 @@ const datosParaRevisar = (s) => [
 // Solicitudes listas para cotizar (registradas, con la fecha habilitada y sin cotización activa)
 const columnasPorCotizar = [
   { campo: 'codigo', titulo: 'Solicitud', className: 'whitespace-nowrap text-stone-500' },
-  { campo: 'cliente', titulo: 'Cliente / evento', render: (s) => <ClienteEvento cliente={s.cliente.nombre} tipoEvento={s.tipoEvento} /> },
+  {
+    campo: 'cliente',
+    titulo: 'Cliente / evento',
+    render: (s) => (
+      <>
+        <ClienteEvento cliente={s.cliente.nombre} tipoEvento={s.tipoEvento} />
+        {s.modificacionSolicitada && <div className="mt-1"><Badge color="rojo">Modificaciones solicitadas</Badge></div>}
+      </>
+    )
+  },
   { campo: 'fecha', titulo: 'Fecha del evento', className: 'whitespace-nowrap', render: (s) => fechaEvento(s.fecha) }
 ];
 
@@ -151,6 +181,14 @@ export default function CotizacionesPage({ user, params }) {
     aprobadas.recargar();
   }
 
+  // Gerencia pidió modificaciones: sale de "Revisión pendiente" y vuelve a "Cotización pendiente"
+  function alSolicitarModificaciones(cotizacion) {
+    setSeleccionadoId(null);
+    setAviso(`Se solicitaron modificaciones de la cotización de ${cotizacion.solicitud.cliente} a Producción y Comercial.`);
+    porAprobar.recargar();
+    porCotizar.recargar();
+  }
+
   return (
     <>
       <EncabezadoPagina
@@ -193,7 +231,7 @@ export default function CotizacionesPage({ user, params }) {
               ? <Vacio>Cargando…</Vacio>
               : <CotizarSolicitud key={seleccionado.id} solicitud={seleccionado} catalogo={catalogo.datos} errorCatalogo={catalogo.error} onEnviada={alEnviar} />
           ) : (
-            <DetalleCotizacion key={seleccionado.id} cotizacion={seleccionado} user={user} onAprobada={alAprobar} onAceptada={alAceptar} />
+            <DetalleCotizacion key={seleccionado.id} cotizacion={seleccionado} user={user} onAprobada={alAprobar} onAceptada={alAceptar} onModificacionesSolicitadas={alSolicitarModificaciones} />
           )}
         </Panel>
       </div>
@@ -242,7 +280,7 @@ function DetalleCalculo({ detalles, total, accion, onQuitar, deshabilitado = fal
   );
 }
 
-function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada }) {
+function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada, onModificacionesSolicitadas }) {
   const { solicitud } = c;
   // RF-10: Gerencia revisa las cotizaciones que están en su revisión
   const puedeRevisar = esGerencia(user) && c.estado === 'pendiente_revision';
@@ -250,6 +288,36 @@ function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada }) {
   const puedeAceptar = esProduccion(user) && c.estado === 'aprobada';
   const [procesando, setProcesando] = useState('');
   const [error, setError] = useState('');
+  // Formulario de Gerencia para solicitar modificaciones
+  const [solicitando, setSolicitando] = useState(false);
+  const [motivos, setMotivos] = useState([]);
+  const [comentario, setComentario] = useState('');
+  const [errores, setErrores] = useState({});
+
+  function alternarMotivo(motivo, marcado) {
+    setMotivos((actuales) => (marcado ? [...actuales, motivo] : actuales.filter((m) => m !== motivo)));
+  }
+
+  function cancelarSolicitud() {
+    setSolicitando(false);
+    setMotivos([]);
+    setComentario('');
+    setErrores({});
+    setError('');
+  }
+
+  async function enviarSolicitud() {
+    setProcesando('modificaciones');
+    setErrores({});
+    setError('');
+    try {
+      onModificacionesSolicitadas(await cotizacionService.solicitarModificaciones(c.id, { motivos, comentario }));
+    } catch (e) {
+      setErrores(e.data?.errores || {});
+      setError(e.message);
+      setProcesando('');
+    }
+  }
 
   // Cambia el estado de la cotización y avisa a la página con la cotización actualizada
   async function ejecutar(accion, cambio, alTerminar) {
@@ -278,23 +346,58 @@ function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada }) {
         // horas guardadas al cotizar; pueden diferir del horario actual si la solicitud se editó
         ['Horas cotizadas', `${solicitud.horasEvento} h`],
         ...datosParaRevisar(solicitud),
-        ['Registrada', new Date(c.createdAt).toLocaleString('es-CL', { dateStyle: 'medium', timeStyle: 'short' })]
+        ['Registrada', fechaHora(c.createdAt)],
+        // quién de Gerencia la revisó por última vez y cuándo
+        ['Revisada por', c.revisadoPor ? `${c.revisadoPor} · ${fechaHora(c.revisadoEn)}` : null]
       ]} />
+      {/* Si se reenvió después de que Gerencia pidió modificaciones, se ve lo que había pedido */}
+      {c.motivosModificacion?.length > 0 && (
+        <ModificacionesSolicitadas
+          titulo="Modificaciones solicitadas anteriormente"
+          motivos={c.motivosModificacion}
+          comentario={c.comentarioModificacion}
+        />
+      )}
       <DetalleCalculo detalles={c.detalles} total={c.total} />
-      {error && <Aviso tipo="error" className="mt-3.5">{error}</Aviso>}
+      {error && !Object.keys(errores).length && <Aviso tipo="error" className="mt-3.5">{error}</Aviso>}
       {/* Lucas: descargar factura en pdf */}
       {/* {esProduccion(user) && c.estado === 'aprobada' && (
         <Boton variante="secundario" className="mt-5 w-full" onClick={descargarPdf}>Descargar factura en PDF</Boton>
       )} */}
-      {puedeRevisar && (
+      {puedeRevisar && !solicitando && (
         <div className="mt-5 grid gap-2.5">
           <Boton onClick={aprobar} disabled={Boolean(procesando)}>
             <span>{procesando === 'aprobar' ? 'Aprobando…' : 'Aprobar cotización'}</span><span aria-hidden="true">→</span>
           </Boton>
-          <Boton variante="secundario" className="disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 disabled:hover:border-stone-300" disabled>
+          <Boton variante="secundario" disabled={Boolean(procesando)} onClick={() => setSolicitando(true)}>
             Solicitar modificaciones
           </Boton>
         </div>
+      )}
+      {puedeRevisar && solicitando && (
+        <section className="mt-5 grid gap-3 border-t border-stone-200 pt-4" aria-label="Solicitar modificaciones">
+          <Antetitulo>Solicitar modificaciones</Antetitulo>
+          <fieldset className="grid gap-1.5">
+            <legend className="mb-1 text-xs font-semibold text-stone-600">Motivos</legend>
+            {Object.entries(MOTIVOS_MODIFICACION).map(([valor, texto]) => (
+              <label key={valor} className="flex items-center gap-2 text-sm text-stone-800">
+                <input type="checkbox" checked={motivos.includes(valor)} disabled={Boolean(procesando)} onChange={(e) => alternarMotivo(valor, e.target.checked)} />
+                {texto}
+              </label>
+            ))}
+            {errores.motivos && <span className="text-xs font-medium text-red-700" data-campo-error>{errores.motivos}</span>}
+          </fieldset>
+          <Campo etiqueta={`Comentario para Producción y Comercial (${comentario.length}/${MAXIMO_COMENTARIO})`} error={errores.comentario}>
+            <textarea rows={4} maxLength={MAXIMO_COMENTARIO} value={comentario} disabled={Boolean(procesando)} onChange={(e) => setComentario(e.target.value)} />
+          </Campo>
+          {error && !Object.keys(errores).length && <Aviso tipo="error" className="mb-0">{error}</Aviso>}
+          <div className="flex gap-2.5">
+            <Boton className="flex-1" disabled={!motivos.length || !comentario.trim() || Boolean(procesando)} onClick={enviarSolicitud}>
+              <span>{procesando === 'modificaciones' ? 'Enviando…' : 'Enviar solicitud'}</span><span aria-hidden="true">→</span>
+            </Boton>
+            <Boton variante="secundario" disabled={Boolean(procesando)} onClick={cancelarSolicitud}>Cancelar</Boton>
+          </div>
+        </section>
       )}
       {puedeAceptar && (
         <Boton className="mt-5 w-full" onClick={aceptar} disabled={Boolean(procesando)}>
@@ -314,7 +417,9 @@ function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada }) {
 // aplican al confirmar (o se descartan al cancelar). Mientras se modifican, no se puede enviar a revisión.
 function CotizarSolicitud({ solicitud: s, catalogo, errorCatalogo, onEnviada }) {
   const disponibles = new Set(catalogo.map((servicio) => servicio.id));
-  const propios = s.servicios || [];
+  const modificacion = s.modificacionSolicitada;
+  // Si Gerencia pidió modificaciones se parte de los servicios que ya tenía la cotización; si no, de los de la solicitud
+  const propios = modificacion ? modificacion.servicios : s.servicios || [];
   // Los servicios de la solicitud que ya no están en el catálogo no se pueden cotizar
   const [excluidos] = useState(() => propios.filter((servicio) => !disponibles.has(servicio.id)).map((servicio) => servicio.nombre));
   const [servicios, setServicios] = useState(() => propios.filter((servicio) => disponibles.has(servicio.id)).map((servicio) => servicio.id));
@@ -415,6 +520,15 @@ function CotizarSolicitud({ solicitud: s, catalogo, errorCatalogo, onEnviada }) 
         ['Horas del evento', calculo ? `${calculo.solicitud.horasEvento} h` : '—'],
         ...datosParaRevisar(s)
       ]} />
+      {modificacion && (
+        <ModificacionesSolicitadas
+          titulo="Gerencia solicitó modificaciones"
+          motivos={modificacion.motivos}
+          comentario={modificacion.comentario}
+          revisadoPor={modificacion.revisadoPor}
+          revisadoEn={modificacion.revisadoEn}
+        />
+      )}
       {errorCatalogo && <Aviso tipo="error">{errorCatalogo}</Aviso>}
       {excluidos.length > 0 && (
         <Aviso tipo="warning">No se incluyeron porque ya no están disponibles en el catálogo: {excluidos.join(', ')}.</Aviso>
