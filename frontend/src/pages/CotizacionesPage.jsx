@@ -23,7 +23,7 @@ const formatoPrecio = new Intl.NumberFormat('es-CL', {
 
 // Mismos estados que EstadoCotizacion en el schema de Prisma
 const ESTADOS = {
-  pendiente_revision: { texto: 'Pendiente de revisión', color: 'amarillo' },
+  pendiente_revision: { texto: 'Estado cotización pendiente', color: 'amarillo' },
   modificaciones_solicitadas: { texto: 'Modificaciones solicitadas', color: 'rojo' },
   aprobada: { texto: 'Aprobada por Gerencia', color: 'verde' },
   enviada: { texto: 'Enviada al cliente', color: 'azul' },
