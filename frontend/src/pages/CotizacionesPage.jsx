@@ -95,7 +95,7 @@ export default function CotizacionesPage({ user, params }) {
   return (
     <>
       <EncabezadoPagina
-        antetitulo="Comercial"
+        antetitulo="Producción y Comercial"
         titulo="Cotizaciones"
         descripcion="Cotizaciones de las solicitudes, calculadas con los precios vigentes del catálogo."
       >

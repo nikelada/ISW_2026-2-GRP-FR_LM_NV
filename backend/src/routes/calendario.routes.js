@@ -10,6 +10,7 @@ router.use(requireAuth);
 router.get('/', validarRango, calendarioController.listar);
 router.get('/disponibilidad', validarConsultaDisponibilidad, calendarioController.disponibilidad);
 router.get('/alternativas', validarConsultaDisponibilidad, calendarioController.alternativas);
+// Lucas: validar fecha debiera restringir rol.
 router.post('/solicitudes/:id/validar-fecha', validarId, calendarioController.validarFecha);
 
 export default router;

@@ -154,6 +154,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
       setSeleccionada(guardada);
       setModo('detalle');
       setErrores({});
+      // Lucas: El toast debe tener sentido para el usuario.
       setAviso({ tipo: 'success', texto: `Solicitud ${guardada.codigo} guardada.` });
       limpiarParametros();
       recargar();
@@ -268,6 +269,7 @@ export default function SolicitudesPage({ user, params, onNavegar }) {
               onRevisarFecha={revisarFecha}
               onUsarAlternativa={usarAlternativa}
               onRegistrarCambio={() => onNavegar(`cambios?nuevo=1&evento=${seleccionada.id}`)}
+              onIrACotizaciones={() => onNavegar('cotizaciones')}
             />
           ) : (
             <>
@@ -324,7 +326,8 @@ function DetalleSolicitud({
   onEditar,
   onRevisarFecha,
   onUsarAlternativa,
-  onRegistrarCambio
+  onRegistrarCambio,
+  onIrACotizaciones
 }) {
   if (!solicitud) {
     return (
@@ -337,6 +340,8 @@ function DetalleSolicitud({
   const s = solicitud;
   const confirmada = s.estado === 'confirmado';
   const puedeRevisarFecha = !confirmada && s.fecha && s.horaInicio && s.horaFin;
+  // Punto de entrada de la cotización: registrada y con la fecha habilitada (RF-03)
+  const listaParaCotizar = s.estado === 'registrada' && s.fechaHabilitada;
   const servicios = s.servicios || [];
   const idsAsociados = new Set(servicios.map((servicio) => servicio.id));
   const serviciosActivos = serviciosDisponibles.filter((servicio) => servicio.tipoServicio?.activo !== false);
@@ -457,6 +462,18 @@ function DetalleSolicitud({
           <Boton onClick={onEditar}><span>{s.faltantes.length ? 'Completar información' : 'Editar solicitud'}</span><span aria-hidden="true">→</span></Boton>
         )}
         {puedeRevisarFecha && <Boton variante="secundario" onClick={onRevisarFecha}>Revisar y habilitar la fecha</Boton>}
+        {puedeEditar && !confirmada && (
+          <>
+            <Boton
+              variante="secundario"
+              className="flex items-center justify-between disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 disabled:hover:border-stone-300"
+              disabled={!listaParaCotizar}
+              onClick={onIrACotizaciones}
+            >
+              <span>{listaParaCotizar ? 'Ir a cotizaciones' : 'Registra la solicitud para habilitar su cotización'}</span><span aria-hidden="true">→</span>
+            </Boton>
+          </>
+        )}
         {puedeEditar && confirmada && (
           <Boton onClick={onRegistrarCambio}><span>Registrar cambio</span><span aria-hidden="true">→</span></Boton>
         )}
