@@ -34,7 +34,7 @@ const ESTADOS = {
 // Las dos vistas de la página
 const VISTAS = {
   cotizar: 'Cotización pendiente',
-  aprobar: 'Aprobación pendiente'
+  aprobar: 'Revisión pendiente'
 };
 
 const LABEL_TIPO_PRECIO = { fijo: 'Precio fijo', por_hora: 'Por hora' };
@@ -109,12 +109,12 @@ export default function CotizacionesPage({ user, params }) {
     setAviso(null);
   }
 
-  // La solicitud sale de "Cotización pendiente" y su cotización pasa a "Aprobación pendiente"
+  // La solicitud sale de "Cotización pendiente" y su cotización pasa a "Revisión pendiente"
   function alEnviar(creada) {
     setVista('aprobar');
     setBusqueda('');
     setSeleccionadoId(creada.id);
-    setAviso(`Cotización de ${creada.solicitud.cliente} enviada a aprobación de Gerencia.`);
+    setAviso(`Cotización de ${creada.solicitud.cliente} enviada a revisión de Gerencia.`);
     porCotizar.recargar();
     porAprobar.recargar();
   }
@@ -124,7 +124,7 @@ export default function CotizacionesPage({ user, params }) {
       <EncabezadoPagina
         antetitulo="Producción y Comercial"
         titulo="Cotizaciones"
-        descripcion="Solicitudes listas para cotizar y cotizaciones que esperan la aprobación de Gerencia."
+        descripcion="Solicitudes listas para cotizar y cotizaciones que esperan la revisión de Gerencia."
       />
       <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_400px]">
         <Panel>
@@ -148,7 +148,7 @@ export default function CotizacionesPage({ user, params }) {
                   ? 'No hay resultados para la búsqueda.'
                   : enCotizar
                     ? 'No hay solicitudes pendientes de cotizar.'
-                    : 'No hay cotizaciones pendientes de aprobación.'
+                    : 'No hay cotizaciones pendientes de revisión.'
               }
               seleccionadoId={seleccionadoId}
               onSeleccionar={seleccionar}
@@ -178,20 +178,18 @@ export default function CotizacionesPage({ user, params }) {
 }
 
 // Cada servicio: arriba la versión del precio (fecha, tipo y precio unitario) y abajo, aparte, el cálculo.
-// Con onQuitar, cada servicio se puede quitar de la cotización.
-function DetalleCalculo({ detalles, total, onQuitar, deshabilitado = false }) {
+// accion se muestra en la misma línea que el título "Servicios cotizados".
+function DetalleCalculo({ detalles, total, accion }) {
   return (
     <section className="border-t border-stone-200 pt-4" aria-label="Servicios cotizados">
-      <Antetitulo className="mb-2.5">Servicios cotizados</Antetitulo>
+      <div className="mb-2.5 flex items-center justify-between gap-3">
+        <Antetitulo>Servicios cotizados</Antetitulo>
+        {accion}
+      </div>
       <ul className="grid gap-4 text-sm">
         {detalles.map((d) => (
           <li key={d.servicioId}>
-            <div className="flex items-start justify-between gap-3">
-              <strong className="block">{d.nombre}</strong>
-              {onQuitar && (
-                <Boton variante="enlace" disabled={deshabilitado} onClick={() => onQuitar(d.servicioId)}>Quitar</Boton>
-              )}
-            </div>
+            <strong className="block">{d.nombre}</strong>
             {d.vigenciaDesde && (
               <small className="block text-stone-500">Última actualización: {fechaDDMMAAAA(d.vigenciaDesde)}</small>
             )}
@@ -237,23 +235,19 @@ function DetalleCotizacion({ cotizacion: c, user }) {
   );
 }
 
-// RF-07: la cotización se muestra ya calculada con los servicios de la solicitud; se pueden quitar o
-// agregar servicios (el total se recalcula solo) y después se envía a aprobación de Gerencia.
-// Cambiar los servicios aquí no modifica la solicitud.
+// RF-07: la cotización se muestra ya calculada con los servicios de la solicitud (precios vigentes)
+// y se envía a revisión de Gerencia. "Modificar servicios" queda como placeholder deshabilitado.
 function CotizarSolicitud({ solicitud: s, catalogo, errorCatalogo, onEnviada }) {
   const disponibles = new Set(catalogo.map((servicio) => servicio.id));
   const propios = s.servicios || [];
   // Los servicios de la solicitud que ya no están en el catálogo no se pueden cotizar
   const [excluidos] = useState(() => propios.filter((servicio) => !disponibles.has(servicio.id)).map((servicio) => servicio.nombre));
-  const [servicios, setServicios] = useState(() => propios.filter((servicio) => disponibles.has(servicio.id)).map((servicio) => servicio.id));
+  const [servicios] = useState(() => propios.filter((servicio) => disponibles.has(servicio.id)).map((servicio) => servicio.id));
   const [calculo, setCalculo] = useState(null);
   const [calculando, setCalculando] = useState(false);
   const [error, setError] = useState('');
   const [enviando, setEnviando] = useState(false);
-  const [tipoParaAgregar, setTipoParaAgregar] = useState('');
-  const [servicioParaAgregar, setServicioParaAgregar] = useState('');
 
-  // Cada cambio en los servicios vuelve a calcular (con los precios vigentes)
   useEffect(() => {
     if (!servicios.length) {
       setCalculo(null);
@@ -269,21 +263,7 @@ function CotizarSolicitud({ solicitud: s, catalogo, errorCatalogo, onEnviada }) 
     return () => { vigente = false; };
   }, [s.id, servicios]);
 
-  const activos = catalogo.filter((servicio) => servicio.tipoServicio?.activo !== false && !servicios.includes(servicio.id));
-  const tipos = Array.from(new Map(activos.map((servicio) => [servicio.tipoServicio.id, servicio.tipoServicio])).values())
-    .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
-  const delTipo = activos.filter((servicio) => servicio.tipoServicioId === Number(tipoParaAgregar));
   const ocupado = calculando || enviando;
-
-  function quitar(id) {
-    setServicios((actuales) => actuales.filter((x) => x !== id));
-  }
-
-  function agregar() {
-    setServicios((actuales) => [...actuales, Number(servicioParaAgregar)]);
-    setTipoParaAgregar('');
-    setServicioParaAgregar('');
-  }
 
   async function enviar() {
     setEnviando(true);
@@ -312,33 +292,26 @@ function CotizarSolicitud({ solicitud: s, catalogo, errorCatalogo, onEnviada }) 
       )}
 
       {calculo ? (
-        <DetalleCalculo detalles={calculo.detalles} total={calculo.total} onQuitar={quitar} deshabilitado={ocupado} />
+        <DetalleCalculo
+          detalles={calculo.detalles}
+          total={calculo.total}
+          accion={
+            <Boton variante="secundario" className="px-3 py-1.5 text-xs disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 disabled:hover:border-stone-300" disabled>
+              Modificar servicios
+            </Boton>
+          }
+        />
       ) : !servicios.length ? (
-        <Vacio>Agrega al menos un servicio para cotizar.</Vacio>
+        <Vacio>La solicitud no tiene servicios disponibles para cotizar.</Vacio>
       ) : calculando ? (
         <Vacio>Calculando…</Vacio>
       ) : null}
-
-      <div className="mt-4 grid gap-2.5 border-t border-stone-200 pt-4">
-        <Antetitulo>Agregar servicio</Antetitulo>
-        <select aria-label="Tipo de servicio para agregar" value={tipoParaAgregar} disabled={ocupado} onChange={(e) => { setTipoParaAgregar(e.target.value); setServicioParaAgregar(''); }}>
-          <option value="">Selecciona un tipo de servicio</option>
-          {tipos.map((tipo) => <option key={tipo.id} value={tipo.id}>{tipo.nombre}</option>)}
-        </select>
-        <div className="flex items-start gap-2.5">
-          <select className="h-10 min-w-0 flex-1" aria-label="Servicio para agregar" value={servicioParaAgregar} disabled={!tipoParaAgregar || ocupado} onChange={(e) => setServicioParaAgregar(e.target.value)}>
-            <option value="">Selecciona un servicio</option>
-            {delTipo.map((servicio) => <option key={servicio.id} value={servicio.id}>{servicio.nombre}</option>)}
-          </select>
-          <Boton variante="secundario" className="h-10 shrink-0" disabled={!servicioParaAgregar || ocupado} onClick={agregar}>Agregar</Boton>
-        </div>
-      </div>
 
       {error && <Aviso tipo="error" className="mt-3.5">{error}</Aviso>}
 
       <div className="mt-5">
         <Boton className="w-full" onClick={enviar} disabled={!calculo || !servicios.length || ocupado}>
-          <span>{enviando ? 'Enviando…' : 'Enviar a aprobación'}</span><span aria-hidden="true">→</span>
+          <span>{enviando ? 'Enviando…' : 'Enviar a revisión de Gerencia'}</span><span aria-hidden="true">→</span>
         </Boton>
       </div>
     </>
