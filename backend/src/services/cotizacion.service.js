@@ -188,6 +188,20 @@ export async function obtenerPorId(id) {
   return aRespuesta(cotizacion);
 }
 
+// RF-10: Gerencia aprueba una cotización que está en su revisión. El cambio de estado se hace
+// solo si sigue en revisión, así dos aprobaciones al mismo tiempo no pisan otro estado.
+export async function aprobar(id) {
+  const { count } = await prisma.cotizacion.updateMany({
+    where: { id, estado: 'pendiente_revision' },
+    data: { estado: 'aprobada' }
+  });
+  if (!count) {
+    await obtenerPorId(id); // 404 si no existe
+    throw Object.assign(new Error('Solo se pueden aprobar cotizaciones que están en revisión de Gerencia.'), { status: 409 });
+  }
+  return obtenerPorId(id);
+}
+
 // Recalcula en el servidor y guarda la cotización pendiente de revisión por Gerencia.
 // Una solicitud no puede tener dos cotizaciones activas (solo se recotiza tras rechazo o sin respuesta).
 export async function crear(datos) {

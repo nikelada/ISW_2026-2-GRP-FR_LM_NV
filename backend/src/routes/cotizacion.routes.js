@@ -3,7 +3,7 @@ import * as cotizacionController from '../controllers/cotizacion.controller.js';
 import { requireAuth } from '../middlewares/auth.middleware.js';
 import { validarCalculo, validarFiltros } from '../middlewares/cotizacion.middleware.js';
 import { validarId } from '../middlewares/id.middleware.js';
-import { autorizarRol, ROLES_PRODUCCION } from '../middlewares/rol.middleware.js';
+import { autorizarRol, ROLES_GERENCIA, ROLES_PRODUCCION } from '../middlewares/rol.middleware.js';
 
 // Consultar: cualquier usuario con sesión (Producción y Comercial, y Gerencia). Por cotizar, calcular y crear: Producción y Comercial.
 const router = Router();
@@ -14,5 +14,7 @@ router.get('/por-cotizar', autorizarRol(ROLES_PRODUCCION), cotizacionController.
 router.get('/:id', validarId, cotizacionController.obtener);
 router.post('/calcular', autorizarRol(ROLES_PRODUCCION), validarCalculo, cotizacionController.calcular);
 router.post('/', autorizarRol(ROLES_PRODUCCION), validarCalculo, cotizacionController.crear);
+// RF-10: revisión de Gerencia
+router.patch('/:id/aprobar', autorizarRol(ROLES_GERENCIA), validarId, cotizacionController.aprobar);
 
 export default router;
