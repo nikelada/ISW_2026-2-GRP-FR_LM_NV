@@ -270,6 +270,13 @@ enum EstadoCotizacion {
   sin_respuesta
 }
 
+// Motivos que marca Gerencia al solicitar modificaciones de una cotización (RF-10)
+enum MotivoModificacion {
+  servicio_no_disponible
+  precio_desactualizado
+  otro
+}
+
 // Cotización de una solicitud, calculada con los precios vigentes
 model Cotizacion {
   id          Int                 @id @default(autoincrement())
@@ -281,6 +288,12 @@ model Cotizacion {
   horasEvento Int?
   // día en que el cliente la aceptó (RF-10), solo fecha; los abonos no pueden tener una fecha anterior
   aceptadaEn  DateTime?           @db.Date
+  // lo que pidió Gerencia la última vez que solicitó modificaciones (RF-10); se conserva al reenviarla
+  motivosModificacion    MotivoModificacion[]
+  comentarioModificacion String?              @db.VarChar(1000)
+  // quién de Gerencia la revisó por última vez (aprobó o solicitó modificaciones) y cuándo
+  revisadoPor            String?              @db.VarChar(150)
+  revisadoEn             DateTime?            @db.Timestamp(6)
   detalles    DetalleCotizacion[]
   abonos      Abono[]
   createdAt   DateTime            @default(now()) @db.Timestamp(6)
