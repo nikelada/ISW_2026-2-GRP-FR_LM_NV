@@ -446,10 +446,6 @@ function DetalleSolicitud({
             </div>
           </div>
         )}
-        <div className="mt-2 flex items-center justify-between border-t border-stone-200 pt-3 text-sm">
-          <span className="text-stone-500">Costo estimado</span>
-          <strong>Pendiente de cálculo</strong>
-        </div>
       </div>
       <ResultadoDisponibilidad
         resultado={resultado}
