@@ -144,6 +144,13 @@ export default function CotizacionesPage({ user, params }) {
     aprobadas.recargar();
   }
 
+  // Aceptada por el cliente, sale de "Cotización aprobada"; sus abonos se registrarán en Abonos
+  function alAceptar(aceptada) {
+    setSeleccionadoId(null);
+    setAviso(`Cotización de ${aceptada.solicitud.cliente} aceptada por el cliente.`);
+    aprobadas.recargar();
+  }
+
   return (
     <>
       <EncabezadoPagina
@@ -186,7 +193,7 @@ export default function CotizacionesPage({ user, params }) {
               ? <Vacio>Cargando…</Vacio>
               : <CotizarSolicitud key={seleccionado.id} solicitud={seleccionado} catalogo={catalogo.datos} errorCatalogo={catalogo.error} onEnviada={alEnviar} />
           ) : (
-            <DetalleCotizacion key={seleccionado.id} cotizacion={seleccionado} user={user} onAprobada={alAprobar} />
+            <DetalleCotizacion key={seleccionado.id} cotizacion={seleccionado} user={user} onAprobada={alAprobar} onAceptada={alAceptar} />
           )}
         </Panel>
       </div>
@@ -228,23 +235,29 @@ function DetalleCalculo({ detalles, total, accion }) {
   );
 }
 
-function DetalleCotizacion({ cotizacion: c, user, onAprobada }) {
+function DetalleCotizacion({ cotizacion: c, user, onAprobada, onAceptada }) {
   const { solicitud } = c;
   // RF-10: Gerencia revisa las cotizaciones que están en su revisión
   const puedeRevisar = esGerencia(user) && c.estado === 'pendiente_revision';
-  const [aprobando, setAprobando] = useState(false);
+  // RF-10: Producción y Comercial registra que el cliente aceptó una cotización aprobada
+  const puedeAceptar = esProduccion(user) && c.estado === 'aprobada';
+  const [procesando, setProcesando] = useState('');
   const [error, setError] = useState('');
 
-  async function aprobar() {
-    setAprobando(true);
+  // Cambia el estado de la cotización y avisa a la página con la cotización actualizada
+  async function ejecutar(accion, cambio, alTerminar) {
+    setProcesando(accion);
     setError('');
     try {
-      onAprobada(await cotizacionService.aprobar(c.id));
+      alTerminar(await cambio(c.id));
     } catch (e) {
       setError(e.message);
-      setAprobando(false);
+      setProcesando('');
     }
   }
+
+  const aprobar = () => ejecutar('aprobar', cotizacionService.aprobar, onAprobada);
+  const aceptar = () => ejecutar('aceptar', cotizacionService.aceptar, onAceptada);
 
   return (
     <>
@@ -262,15 +275,24 @@ function DetalleCotizacion({ cotizacion: c, user, onAprobada }) {
       ]} />
       <DetalleCalculo detalles={c.detalles} total={c.total} />
       {error && <Aviso tipo="error" className="mt-3.5">{error}</Aviso>}
+      {/* Lucas: descargar factura en pdf */}
+      {/* {esProduccion(user) && c.estado === 'aprobada' && (
+        <Boton variante="secundario" className="mt-5 w-full" onClick={descargarPdf}>Descargar factura en PDF</Boton>
+      )} */}
       {puedeRevisar && (
         <div className="mt-5 grid gap-2.5">
-          <Boton onClick={aprobar} disabled={aprobando}>
-            <span>{aprobando ? 'Aprobando…' : 'Aprobar cotización'}</span><span aria-hidden="true">→</span>
+          <Boton onClick={aprobar} disabled={Boolean(procesando)}>
+            <span>{procesando === 'aprobar' ? 'Aprobando…' : 'Aprobar cotización'}</span><span aria-hidden="true">→</span>
           </Boton>
           <Boton variante="secundario" className="disabled:cursor-not-allowed disabled:bg-stone-100 disabled:text-stone-400 disabled:hover:border-stone-300" disabled>
             Solicitar modificaciones
           </Boton>
         </div>
+      )}
+      {puedeAceptar && (
+        <Boton className="mt-5 w-full" onClick={aceptar} disabled={Boolean(procesando)}>
+          <span>{procesando === 'aceptar' ? 'Aceptando…' : 'Aceptar cotización'}</span><span aria-hidden="true">→</span>
+        </Boton>
       )}
       {/* Gerencia no tiene la sección Solicitudes */}
       {esProduccion(user) && (
