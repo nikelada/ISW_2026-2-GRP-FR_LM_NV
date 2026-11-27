@@ -94,7 +94,15 @@ const INCLUIR_OPERACION = {
     include: { personal: true },
     orderBy: { createdAt: 'asc' }
   },
-  tareas: { orderBy: { createdAt: 'asc' } },
+  tareas: {
+    include: {
+      responsables: {
+        include: { personalEvento: { include: { personal: true } } },
+        orderBy: { createdAt: 'asc' }
+      }
+    },
+    orderBy: { createdAt: 'asc' }
+  },
   pagos: { orderBy: { createdAt: 'asc' } },
   cierre: { include: { aprobadoPor: { select: { id: true, name: true } } } }
 };
@@ -161,13 +169,40 @@ export async function asignarPersonal(solicitudId, datos) {
 export async function quitarPersonal(asignacionId) {
   const asignacion = await prisma.personalEvento.findUnique({ where: { id: asignacionId } });
   if (!asignacion) throw errorConEstado('Asignación de personal no encontrada.', 404);
+  const tareaAsignada = await prisma.tareaPersonal.findFirst({ where: { personalEventoId: asignacionId } });
+  if (tareaAsignada) {
+    throw errorConEstado('No se puede quitar a esta persona porque tiene tareas asignadas en el evento.', 409);
+  }
   await asegurarEventoAbierto(asignacion.solicitudId);
   await prisma.personalEvento.delete({ where: { id: asignacionId } });
 }
 
-export async function crearTarea(solicitudId, datos) {
+export async function crearTarea(solicitudId, { titulo, descripcion, responsablesIds }) {
   await asegurarEventoAbierto(solicitudId);
-  return prisma.tareaEvento.create({ data: { solicitudId, ...datos } });
+  const asignaciones = await prisma.personalEvento.findMany({
+    where: { id: { in: responsablesIds }, solicitudId },
+    select: { id: true }
+  });
+  if (asignaciones.length !== responsablesIds.length) {
+    throw errorConEstado('Uno o más responsables no están asignados a este evento.', 400);
+  }
+  return prisma.tareaEvento.create({
+    data: {
+      solicitudId,
+      titulo,
+      descripcion,
+      responsables: {
+        create: responsablesIds.map((personalEventoId) => ({
+          personalEvento: { connect: { id: personalEventoId } }
+        }))
+      }
+    },
+    include: {
+      responsables: {
+        include: { personalEvento: { include: { personal: true } } }
+      }
+    }
+  });
 }
 
 export async function alternarTarea(id) {

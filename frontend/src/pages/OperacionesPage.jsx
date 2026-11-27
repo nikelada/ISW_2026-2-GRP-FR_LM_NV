@@ -12,7 +12,18 @@ import * as inventarioService from '../services/inventarioService.js';
 const etiqueta = (texto = '') => texto.replaceAll('_', ' ');
 const moneda = (valor) => Number(valor).toLocaleString('es-CL', { style: 'currency', currency: 'CLP' });
 
-function ListaEstado({ titulo, elementos, campoEstado, alCambiar, textoVacio, deshabilitado = false }) {
+function ListaEstado({
+  titulo,
+  elementos,
+  campoEstado,
+  alCambiar,
+  textoVacio,
+  deshabilitado = false,
+  puedeCambiar = true,
+  mostrarResponsables = false,
+  textoPendiente = 'Marcar completado',
+  textoCompletada = 'Reabrir'
+}) {
   return (
     <section className="grid gap-2">
       <h3 className="font-bold">{titulo}</h3>
@@ -21,18 +32,23 @@ function ListaEstado({ titulo, elementos, campoEstado, alCambiar, textoVacio, de
           {elementos.map((item) => (
             <li key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded border border-stone-200 p-3 text-sm">
               <span>
-                <strong>{item.titulo || item.concepto || item.personal?.nombre || item.recurso?.nombre || item.inventario?.nombre}</strong>
+                <strong>{item.titulo || item.concepto || item.recurso?.nombre || item.inventario?.nombre}</strong>
                 {item.cantidad !== undefined && <span className="ml-2 text-stone-600">· {item.cantidad} unidad(es)</span>}
-                {item.funcion && <span className="text-stone-500"> · {item.funcion}</span>}
                 {item.descripcion && <span className="block text-stone-500">{item.descripcion}</span>}
+                {mostrarResponsables && (
+                  <span className="block text-stone-500">
+                    Responsables: {item.responsables?.length
+                      ? item.responsables.map(({ personalEvento }) => personalEvento.personal.nombre).join(', ')
+                      : 'sin responsables registrados'}
+                  </span>
+                )}
                 {item.monto !== undefined && <span className="ml-2 text-stone-600">{moneda(item.monto)}</span>}
-                {item.personal?.esContacto && <span className="ml-2 text-teal-700">· contacto guardado</span>}
                 {item.inventario && !item.inventario.reutilizable && <span className="ml-2 text-stone-500">· consumido</span>}
                 {item.devueltoEn !== undefined && (!item.inventario || item.inventario.reutilizable) && <span className="ml-2 text-stone-500">· {item.devueltoEn ? 'devuelto' : 'pendiente de devolución'}</span>}
               </span>
-              {campoEstado && (
+              {campoEstado && puedeCambiar && (
                 <Boton variante="secundario" className="py-1.5!" disabled={deshabilitado} onClick={() => alCambiar(item)}>
-                  {item[campoEstado] === 'pendiente' ? 'Marcar completado' : 'Reabrir'}
+                  {item[campoEstado] === 'pendiente' ? textoPendiente : textoCompletada}
                 </Boton>
               )}
             </li>
@@ -67,11 +83,7 @@ export default function OperacionesPage({ user }) {
     useCallback(() => eventoId ? operacionesService.obtenerOperacion(eventoId) : Promise.resolve(null), [eventoId]),
     null
   );
-  const contactosFetch = useFetch(
-    useCallback(() => esAdmin ? operacionesService.listarContactos() : Promise.resolve([]), [esAdmin])
-  );
-  const [personalForm, setPersonalForm] = useState({ personalId: '', nombre: '', telefono: '', correo: '', funcion: '' });
-  const [tareaForm, setTareaForm] = useState({ titulo: '', descripcion: '' });
+  const [tareaForm, setTareaForm] = useState({ titulo: '', descripcion: '', responsablesIds: [] });
   const [pagoForm, setPagoForm] = useState({ concepto: '', monto: '' });
   const [encuesta, setEncuesta] = useState({ encuestaConforme: '', encuestaComentario: '' });
   const [aviso, setAviso] = useState(null);
@@ -99,7 +111,8 @@ export default function OperacionesPage({ user }) {
     try {
       await accion();
       setAviso({ tipo: 'success', texto: mensaje });
-      await Promise.all([eventoFetch.recargar(), contactosFetch.recargar(), eventosFetch.recargar()]);
+      await Promise.all([eventoFetch.recargar(), eventosFetch.recargar()]);
+      return true;
     } catch (error) {
       const pendientes = error.data?.pendientes;
       setAviso({
@@ -107,6 +120,7 @@ export default function OperacionesPage({ user }) {
         texto: pendientes?.length ? `${error.message} ${pendientes.join(' ')}` : error.message
       });
       await eventoFetch.recargar();
+      return false;
     } finally {
       setOcupado(false);
     }
@@ -131,7 +145,14 @@ export default function OperacionesPage({ user }) {
 
       <Panel className="mb-4">
         <Campo etiqueta="Evento confirmado">
-          <select aria-label="Evento confirmado" value={eventoId} onChange={(e) => setEventoId(e.target.value)}>
+          <select
+            aria-label="Evento confirmado"
+            value={eventoId}
+            onChange={(e) => {
+              setEventoId(e.target.value);
+              setTareaForm({ ...tareaForm, responsablesIds: [] });
+            }}
+          >
             <option value="">Seleccionar evento</option>
             {opcionesEvento}
           </select>
@@ -203,68 +224,75 @@ export default function OperacionesPage({ user }) {
               )}
             </section>
 
+            <section className="mt-6 grid gap-3 border-t border-stone-200 pt-5">
+              <h3 className="font-bold">Tareas del evento</h3>
+              <p className="text-sm text-stone-600">Indica quiénes realizarán cada tarea y confirma cuando el trabajo esté terminado.</p>
+              {esAdmin && !cerrado && (
+                <form className="grid max-w-2xl gap-3" onSubmit={async (e) => {
+                    e.preventDefault();
+                    const guardada = await ejecutar(() => operacionesService.crearTarea(evento.id, {
+                      ...tareaForm,
+                      responsablesIds: tareaForm.responsablesIds.map(Number)
+                    }), 'Tarea asignada al personal seleccionado.');
+                    if (guardada) setTareaForm({ titulo: '', descripcion: '', responsablesIds: [] });
+                  }}>
+                  <Campo etiqueta="Nueva tarea"><input required maxLength={150} value={tareaForm.titulo} onChange={(e) => setTareaForm({ ...tareaForm, titulo: e.target.value })} /></Campo>
+                  <Campo etiqueta="Descripción"><input maxLength={2000} value={tareaForm.descripcion} onChange={(e) => setTareaForm({ ...tareaForm, descripcion: e.target.value })} /></Campo>
+                  {evento.personalAsignado.length === 0 ? (
+                    <p className="text-sm text-amber-800">Primero asigna personal a este evento desde la sección Personal.</p>
+                  ) : (
+                    <Campo etiqueta="Empleados responsables">
+                      <select
+                        multiple
+                        required
+                        size={Math.min(Math.max(evento.personalAsignado.length, 2), 5)}
+                        value={tareaForm.responsablesIds}
+                        onChange={(e) => setTareaForm({
+                          ...tareaForm,
+                          responsablesIds: [...e.target.selectedOptions].map((opcion) => opcion.value)
+                        })}
+                        aria-label="Empleados responsables de la tarea"
+                      >
+                        {evento.personalAsignado.map((asignacion) => (
+                          <option key={asignacion.id} value={asignacion.id}>
+                            {asignacion.personal.nombre}{asignacion.funcion ? ` · ${asignacion.funcion}` : ''}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="font-normal">Mantén Ctrl (Windows) o Cmd (Mac) para elegir a varias personas.</span>
+                    </Campo>
+                  )}
+                  <Boton type="submit" disabled={ocupado || !evento.personalAsignado.length || !tareaForm.responsablesIds.length}>Agregar tarea</Boton>
+                </form>
+              )}
+              <ListaEstado
+                titulo="Seguimiento del trabajo"
+                elementos={evento.tareas}
+                campoEstado="estado"
+                puedeCambiar={esAdmin && !cerrado}
+                deshabilitado={ocupado}
+                mostrarResponsables
+                textoPendiente="Confirmar trabajo terminado"
+                textoCompletada="Reabrir tarea"
+                alCambiar={(tarea) => ejecutar(() => operacionesService.alternarTarea(tarea.id), 'Estado de tarea actualizado.')}
+                textoVacio="No hay tareas registradas para este evento."
+              />
+            </section>
+
             {esAdmin && !cerrado && (
               <div className="mt-6 grid gap-6 border-t border-stone-200 pt-5 lg:grid-cols-2">
                 <section className="grid content-start gap-3">
-                  <h3 className="font-bold">Asignar personal eventual</h3>
-                  <form className="grid gap-3" onSubmit={(e) => {
+                  <h3 className="font-bold">Pagos</h3>
+                  <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(e) => {
                     e.preventDefault();
-                    const datos = personalForm.personalId
-                      ? { personalId: Number(personalForm.personalId), funcion: personalForm.funcion }
-                      : personalForm;
-                    ejecutar(() => operacionesService.asignarPersonal(evento.id, datos), 'Personal asignado.');
-                    setPersonalForm({ personalId: '', nombre: '', telefono: '', correo: '', funcion: '' });
+                    ejecutar(() => operacionesService.crearPago(evento.id, { ...pagoForm, monto: Number(pagoForm.monto) }), 'Pago agregado.');
+                    setPagoForm({ concepto: '', monto: '' });
                   }}>
-                    <Campo etiqueta="Usar contacto guardado"><select value={personalForm.personalId} onChange={(e) => setPersonalForm({ ...personalForm, personalId: e.target.value })}><option value="">Crear nuevo personal</option>{contactosFetch.datos.map((contacto) => <option key={contacto.id} value={contacto.id}>{contacto.nombre}</option>)}</select></Campo>
-                    {!personalForm.personalId && <>
-                      <Campo etiqueta="Nombre"><input required value={personalForm.nombre} onChange={(e) => setPersonalForm({ ...personalForm, nombre: e.target.value })} /></Campo>
-                      <Campo etiqueta="Teléfono"><input value={personalForm.telefono} onChange={(e) => setPersonalForm({ ...personalForm, telefono: e.target.value })} /></Campo>
-                      <Campo etiqueta="Correo"><input type="email" value={personalForm.correo} onChange={(e) => setPersonalForm({ ...personalForm, correo: e.target.value })} /></Campo>
-                    </>}
-                    <Campo etiqueta="Función en el evento"><input value={personalForm.funcion} onChange={(e) => setPersonalForm({ ...personalForm, funcion: e.target.value })} /></Campo>
-                    <Boton type="submit" disabled={ocupado}>Asignar</Boton>
+                    <Campo etiqueta="Concepto"><input required maxLength={150} value={pagoForm.concepto} onChange={(e) => setPagoForm({ ...pagoForm, concepto: e.target.value })} /></Campo>
+                    <Campo etiqueta="Monto CLP"><input required type="number" min="1" step="1" value={pagoForm.monto} onChange={(e) => setPagoForm({ ...pagoForm, monto: e.target.value })} /></Campo>
+                    <div className="self-end"><Boton type="submit" disabled={ocupado}>Agregar</Boton></div>
                   </form>
-                  {evento.personalAsignado.length === 0
-                    ? <p className="text-sm text-stone-500">No hay personal eventual asignado.</p>
-                    : (
-                    <ul className="grid gap-2">
-                      {evento.personalAsignado.map((asignacion) => (
-                        <li key={asignacion.id} className="flex items-center justify-between rounded border border-stone-200 p-3 text-sm">
-                          <span><strong>{asignacion.personal.nombre}</strong>{asignacion.funcion && ` · ${asignacion.funcion}`}{asignacion.personal.esContacto && <small className="block text-teal-700">Contacto guardado para futuros eventos</small>}</span>
-                          {!cerrado && <Boton variante="enlace" onClick={() => ejecutar(() => operacionesService.quitarPersonal(asignacion.id), 'Asignación eliminada.')}>Quitar</Boton>}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </section>
-
-                <section className="grid content-start gap-5">
-                  <div className="grid gap-3">
-                    <h3 className="font-bold">Tareas</h3>
-                    <form className="grid gap-3" onSubmit={(e) => {
-                      e.preventDefault();
-                      ejecutar(() => operacionesService.crearTarea(evento.id, tareaForm), 'Tarea agregada.');
-                      setTareaForm({ titulo: '', descripcion: '' });
-                    }}>
-                      <Campo etiqueta="Nueva tarea"><input required maxLength={150} value={tareaForm.titulo} onChange={(e) => setTareaForm({ ...tareaForm, titulo: e.target.value })} /></Campo>
-                      <Campo etiqueta="Descripción"><input maxLength={2000} value={tareaForm.descripcion} onChange={(e) => setTareaForm({ ...tareaForm, descripcion: e.target.value })} /></Campo>
-                      <Boton type="submit" disabled={ocupado}>Agregar tarea</Boton>
-                    </form>
-                    <ListaEstado titulo="Seguimiento" elementos={evento.tareas} campoEstado="estado" deshabilitado={ocupado} alCambiar={(tarea) => ejecutar(() => operacionesService.alternarTarea(tarea.id), 'Estado de tarea actualizado.')} textoVacio="No hay tareas registradas." />
-                  </div>
-                  <div className="grid gap-3">
-                    <h3 className="font-bold">Pagos</h3>
-                    <form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]" onSubmit={(e) => {
-                      e.preventDefault();
-                      ejecutar(() => operacionesService.crearPago(evento.id, { ...pagoForm, monto: Number(pagoForm.monto) }), 'Pago agregado.');
-                      setPagoForm({ concepto: '', monto: '' });
-                    }}>
-                      <Campo etiqueta="Concepto"><input required maxLength={150} value={pagoForm.concepto} onChange={(e) => setPagoForm({ ...pagoForm, concepto: e.target.value })} /></Campo>
-                      <Campo etiqueta="Monto CLP"><input required type="number" min="1" step="1" value={pagoForm.monto} onChange={(e) => setPagoForm({ ...pagoForm, monto: e.target.value })} /></Campo>
-                      <div className="self-end"><Boton type="submit" disabled={ocupado}>Agregar</Boton></div>
-                    </form>
-                    <ListaEstado titulo="Seguimiento" elementos={evento.pagos} campoEstado="estado" deshabilitado={ocupado} alCambiar={(pago) => ejecutar(() => operacionesService.alternarPago(pago.id), 'Estado de pago actualizado.')} textoVacio="No hay pagos registrados." />
-                  </div>
+                  <ListaEstado titulo="Seguimiento" elementos={evento.pagos} campoEstado="estado" deshabilitado={ocupado} alCambiar={(pago) => ejecutar(() => operacionesService.alternarPago(pago.id), 'Estado de pago actualizado.')} textoVacio="No hay pagos registrados." />
                 </section>
               </div>
             )}

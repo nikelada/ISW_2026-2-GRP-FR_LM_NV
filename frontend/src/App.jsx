@@ -11,6 +11,7 @@ import SolicitudesPage from './pages/SolicitudesPage.jsx';
 import InventarioPage from './pages/InventarioPage.jsx';
 import OperacionesPage from './pages/OperacionesPage.jsx';
 import UbicacionesPage from './pages/UbicacionesPage.jsx';
+import PersonalPage from './pages/PersonalPage.jsx';
 import { getCurrentUser } from './services/authService.js';
 import * as cambioService from './services/cambioService.js';
 import { esGerencia } from './utils/roles.js';
@@ -27,7 +28,8 @@ const SECCIONES = [
   { clave: 'cotizaciones', titulo: 'Cotizaciones', Pagina: CotizacionesPage, roles: ['usuario', 'manager', 'admin'] },
   { clave: 'inventario', titulo: 'Inventario', Pagina: InventarioPage, roles: ['manager', 'admin'] },
   { clave: 'ubicaciones', titulo: 'Ubicaciones', Pagina: UbicacionesPage, roles: ['admin'] },
-  { clave: 'operaciones', titulo: 'Operaciones', Pagina: OperacionesPage, roles: ['manager', 'admin'] }
+  { clave: 'operaciones', titulo: 'Operaciones', Pagina: OperacionesPage, roles: ['manager', 'admin'] },
+  { clave: 'personal', titulo: 'Personal', Pagina: PersonalPage, roles: ['admin'] }
 ];
 
 function leerHash() {

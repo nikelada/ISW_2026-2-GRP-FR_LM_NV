@@ -81,10 +81,16 @@ export function validarPersonal(req, res, next) {
 export function validarTarea(req, res, next) {
   const titulo = String(req.body.titulo || '').trim();
   const descripcion = String(req.body.descripcion || '').trim();
+  const responsablesIds = Array.isArray(req.body.responsablesIds)
+    ? [...new Set(req.body.responsablesIds.map(Number))]
+    : [];
   if (!titulo || titulo.length > 150 || descripcion.length > 2000) {
     return res.status(400).json({ message: 'La tarea requiere un título de hasta 150 caracteres y una descripción de hasta 2000.' });
   }
-  req.body = { titulo, descripcion: descripcion || null };
+  if (!responsablesIds.length || responsablesIds.some((id) => !Number.isInteger(id) || id <= 0)) {
+    return res.status(400).json({ message: 'Selecciona al menos un empleado responsable de la tarea.' });
+  }
+  req.body = { titulo, descripcion: descripcion || null, responsablesIds };
   next();
 }
 

@@ -400,6 +400,7 @@ model PersonalEvento {
   funcion     String?          @db.VarChar(100)
   solicitud   Solicitud        @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
   personal    PersonalEventual @relation(fields: [personalId], references: [id], onDelete: Restrict)
+  tareas      TareaPersonal[]
   createdAt   DateTime         @default(now()) @db.Timestamp(6)
 
   @@unique([solicitudId, personalId])
@@ -408,17 +409,30 @@ model PersonalEvento {
 }
 
 model TareaEvento {
-  id          Int               @id @default(autoincrement())
-  solicitudId Int
-  titulo      String            @db.VarChar(150)
-  descripcion String?           @db.Text
-  estado      EstadoTareaEvento @default(pendiente)
-  solicitud   Solicitud         @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
-  createdAt   DateTime          @default(now()) @db.Timestamp(6)
-  updatedAt   DateTime          @updatedAt @db.Timestamp(6)
+  id           Int               @id @default(autoincrement())
+  solicitudId  Int
+  titulo       String            @db.VarChar(150)
+  descripcion  String?           @db.Text
+  estado       EstadoTareaEvento @default(pendiente)
+  solicitud    Solicitud         @relation(fields: [solicitudId], references: [id], onDelete: Restrict)
+  responsables TareaPersonal[]
+  createdAt    DateTime          @default(now()) @db.Timestamp(6)
+  updatedAt    DateTime          @updatedAt @db.Timestamp(6)
 
   @@index([solicitudId, estado])
   @@map("tareas_evento")
+}
+
+model TareaPersonal {
+  tareaId          Int
+  personalEventoId Int
+  tarea            TareaEvento    @relation(fields: [tareaId], references: [id], onDelete: Restrict)
+  personalEvento   PersonalEvento @relation(fields: [personalEventoId], references: [id], onDelete: Restrict)
+  createdAt        DateTime       @default(now()) @db.Timestamp(6)
+
+  @@id([tareaId, personalEventoId])
+  @@index([personalEventoId])
+  @@map("tareas_personal")
 }
 
 model PagoEvento {

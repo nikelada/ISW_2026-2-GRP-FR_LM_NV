@@ -55,15 +55,18 @@ async function obtenerOCrearPersonalEventual(data) {
   return { registro: await prisma.personalEventual.create({ data }), creado: true };
 }
 
-async function obtenerOCrearTareaEvento(solicitudId, data) {
+async function obtenerOCrearTareaEvento(solicitudId, { responsablesIds = [], ...data }) {
   const existente = await prisma.tareaEvento.findFirst({
     where: { solicitudId, titulo: data.titulo }
   });
-  if (existente) return { registro: existente, creado: false };
-  return {
-    registro: await prisma.tareaEvento.create({ data: { solicitudId, ...data } }),
-    creado: true
-  };
+  const registro = existente || await prisma.tareaEvento.create({ data: { solicitudId, ...data } });
+  if (responsablesIds.length) {
+    await prisma.tareaPersonal.createMany({
+      data: responsablesIds.map((personalEventoId) => ({ tareaId: registro.id, personalEventoId })),
+      skipDuplicates: true
+    });
+  }
+  return { registro, creado: !existente };
 }
 
 async function obtenerOCrearPagoEvento(solicitudId, data) {
@@ -192,6 +195,7 @@ async function crearDatosOperacionesDemo(solicitudId) {
     { nombre: 'Diego Paredes (prueba)', telefono: '+56 9 7000 0004', correo: 'diego.paredes@example.com', funcion: 'Apoyo logístico' },
     { nombre: 'Camila Fuentes (prueba)', telefono: '+56 9 7000 0005', correo: 'camila.fuentes@example.com', funcion: 'Atención de invitados' }
   ];
+  const asignaciones = [];
   for (const { funcion, ...datos } of trabajadores) {
     const personal = await obtenerOCrearPersonalEventual({ ...datos, esContacto: true });
     if (personal.creado) resultado.personal += 1;
@@ -199,17 +203,18 @@ async function crearDatosOperacionesDemo(solicitudId) {
     const asignacionExistente = await prisma.personalEvento.findUnique({
       where: { solicitudId_personalId: { solicitudId, personalId: personal.registro.id } }
     });
-    if (!asignacionExistente) {
-      await prisma.personalEvento.create({
+    const asignacion = asignacionExistente || await prisma.personalEvento.create({
         data: { solicitudId, personalId: personal.registro.id, funcion }
       });
+    if (!asignacionExistente) {
       resultado.asignaciones += 1;
     }
+    asignaciones.push(asignacion.id);
   }
 
   const tareas = [
-    { titulo: 'Preparar montaje de prueba', descripcion: 'Revisar mesas y sillas del evento.', estado: 'completada' },
-    { titulo: 'Probar sonido de prueba', descripcion: 'Verificar micrófonos y amplificación.', estado: 'pendiente' }
+    { titulo: 'Preparar montaje de prueba', descripcion: 'Revisar mesas y sillas del evento.', estado: 'completada', responsablesIds: [asignaciones[1]] },
+    { titulo: 'Probar sonido de prueba', descripcion: 'Verificar micrófonos y amplificación.', estado: 'pendiente', responsablesIds: [asignaciones[2]] }
   ];
   for (const datos of tareas) {
     const tarea = await obtenerOCrearTareaEvento(solicitudId, datos);
