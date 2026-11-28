@@ -86,7 +86,7 @@ export async function registrar({ cotizacionId, monto, fecha }) {
       });
     }
 
-    await transaction.abono.create({ data: { cotizacionId, monto, fecha: fechaPago } });
+    await transaction.abonoCliente.create({ data: { cotizacionId, monto, fecha: fechaPago } });
 
     if (confirmaEvento) {
       await transaction.solicitud.update({ where: { id: cotizacion.solicitudId }, data: { estado: 'confirmado' } });

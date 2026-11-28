@@ -308,7 +308,7 @@ model Cotizacion {
   motivosRechazo         MotivoRechazo[]
   detalleRechazo         String?              @db.VarChar(1000)
   detalles    DetalleCotizacion[]
-  abonos      Abono[]
+  abonos      AbonoCliente[]
   createdAt   DateTime            @default(now()) @db.Timestamp(6)
   updatedAt   DateTime            @updatedAt @db.Timestamp(6)
 
@@ -333,8 +333,8 @@ model DetalleCotizacion {
   @@map("detalles_cotizacion")
 }
 
-// Pago del cliente para una cotización aceptada (RF-08)
-model Abono {
+// Abono que paga el cliente por una cotización aceptada (RF-08); no es un pago de PagoEvento
+model AbonoCliente {
   id           Int        @id @default(autoincrement())
   cotizacionId Int
   cotizacion   Cotizacion @relation(fields: [cotizacionId], references: [id], onDelete: Restrict)
@@ -346,7 +346,7 @@ model Abono {
   createdAt    DateTime   @default(now()) @db.Timestamp(6)
 
   @@index([cotizacionId])
-  @@map("abonos")
+  @@map("abonos_cliente")
 }
 
 enum TipoRecursoOperativo {
