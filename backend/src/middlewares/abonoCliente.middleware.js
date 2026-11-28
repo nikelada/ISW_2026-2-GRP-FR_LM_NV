@@ -9,7 +9,7 @@ function enteroPositivo(valor) {
 
 // Para registrar un abono (RF-08): { cotizacionId, monto, fecha: 'AAAA-MM-DD' }, todos obligatorios.
 // Los límites que dependen de la cotización (saldo y fechas) los revisa el servicio.
-export function validarAbono(req, res, next) {
+export function validarAbonoCliente(req, res, next) {
   const errores = {};
   const cotizacionId = enteroPositivo(req.body.cotizacionId);
   const monto = enteroPositivo(req.body.monto);

@@ -9,7 +9,7 @@ import ListaDatos from '../components/ui/ListaDatos.jsx';
 import Panel from '../components/ui/Panel.jsx';
 import Vacio from '../components/ui/Vacio.jsx';
 import { useFetch } from '../hooks/useFetch.js';
-import * as abonoService from '../services/abonoService.js';
+import * as abonoClienteService from '../services/abonoClienteService.js';
 import { formatearFecha, formatearHorario } from '../utils/fechas.js';
 
 const formatoPrecio = new Intl.NumberFormat('es-CL', {
@@ -54,7 +54,7 @@ export default function AbonosPage() {
   const [seleccionadaId, setSeleccionadaId] = useState(null);
   const [aviso, setAviso] = useState(null);
   const { datos: cotizaciones, cargando, error, recargar } = useFetch(
-    useCallback(() => abonoService.listar(), [])
+    useCallback(() => abonoClienteService.listar(), [])
   );
   const seleccionada = cotizaciones.find((c) => c.id === seleccionadaId) || null;
   const texto = busqueda.trim().toLowerCase();
@@ -135,7 +135,7 @@ function DetalleAbonos({ cotizacion: c, onRegistrado }) {
     setErrores({});
     setError('');
     try {
-      const actualizada = await abonoService.registrar({ cotizacionId: c.id, monto: Number(monto), fecha });
+      const actualizada = await abonoClienteService.registrar({ cotizacionId: c.id, monto: Number(monto), fecha });
       onRegistrado(actualizada, Number(monto));
       setMonto('');
       setFecha(hoy());
